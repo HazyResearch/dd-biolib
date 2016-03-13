@@ -27,10 +27,11 @@ from __future__ import print_function
 
 import umls
 from umls.graph import pprint_tree
-
+import sys
 
 meta = umls.Metathesaurus()
 norm = umls.MetaNorm(function=lambda x:x.lower())
+
 
 #
 # UMLS Concepts and Relations
@@ -41,6 +42,14 @@ taxonomy = meta.semantic_network.graph(relation="isa")
 root_nodes = ([node for node in taxonomy if not taxonomy.predecessors(node)])
 for node in root_nodes:
     pprint_tree(taxonomy,node)
+
+# UMLS semantic groups
+
+print( meta.semantic_network.groups["Anatomy"] )
+
+
+sys.exit()
+
 
 # UMLS normalizes concepts with a CUI (Concept Unique Identifier)
 # e.g., C0002645 is 'Amoxycillin'
@@ -54,7 +63,7 @@ print(rel)
 
 # Search for concepts (CUIs) by string. This is a noisy match. We don't perform
 # any disambiguation so CUIs are not guaranteed to actually be related.
-matches = meta.match_concepts("hands", match_substring=False) 
+matches = meta.match_concepts("Denys-Drash syndrome", match_substring=False) 
 print("Found %d string->concept matches" % len(matches))
 for cui in matches:
     concept = meta.concept(cui=cui) 
@@ -64,16 +73,22 @@ for cui in matches:
 # Building Dictionaries and Relation Tuples
 #
 
+'''
 # List all semantic types, relations, and source vocabularies
 print(meta.get_source_vocabulary_defs())
 print(sorted(meta.get_semtypes_list()))
 print(sorted(meta.get_relations_list()))
-
+'''
+    
 # Build dictionaries for a given semantic type (i.e., entity)
 d = meta.dictionary("Disease or Syndrome")
 d = map(norm.normalize,d)
 for term in sorted(d,key=lambda x:len(x.split()),reverse=1):
     print(term)
+
+
+
+sys.exit()
 
 # Generate relation examples from given semantic types. This is 
 # highly dependent on the choice of source vocabulary. 

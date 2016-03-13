@@ -18,15 +18,20 @@ class SemanticNetwork(object):
     https://www.ncbi.nlm.nih.gov/books/NBK9679/
 
     """
-    def __init__(self):
+    def __init__(self,conn=None):
         
-        self.conn = database.MySqlConn(umls.config.HOST, umls.config.USER, 
-                                       umls.config.DATABASE)
-        self.conn.connect()
+        if not conn:
+            self.conn = database.MySqlConn(umls.config.HOST, umls.config.USER, 
+                                       umls.config.DATABASE, umls.config.PASSWOPD)
+            self.conn.connect()
+        else:
+            self.conn = conn
+            
         self._networks = {}
         
         # load semantic group definitions
-        #self.abbrv, self.semgroups = self.__load_sem_groups()
+        self.abbrv, self.groups = self.__load_sem_groups()
+        
         
     def __load_sem_groups(self):
         '''
@@ -46,7 +51,9 @@ class SemanticNetwork(object):
         isas = {parent:isas[parent].keys() for parent in isas}    
         return abbrvs,isas
     
-    def __build_semantic_network(self, relation="isa", directed=True):
+    
+    def __build_semantic_network(self, relation="isa", directed=True, 
+                                 simulate_root=True):
         """Load semantic network structure for a given relation."""
         
         sql_tmpl = """SELECT C.STY_RL1,C.RL,C.STY_RL2 FROM SRSTR AS C INNER 
@@ -62,10 +69,17 @@ class SemanticNetwork(object):
         for row in results:
             child,_,parent = map(str,row)
             G.add_edge(parent,child)
+        
+        # Some concept graphs lack a shared root, so add one.
+        root_nodes = [node for node in G if not G.predecessors(node)]
+        if len(root_nodes) > 1 and simulate_root:
+            root = "ROOT"
+            for child in root_nodes:
+                G.add_edge(root,child)
             
         return G
     
-    def graph(self, relation="isa", directed=True):
+    def graph(self, relation="isa", directed=True, simulate_root=True):
         """Build a semantic network (graph) given the provided relation"""
         if relation not in self._networks:
             self._networks[relation] = self.__build_semantic_network(relation,directed)

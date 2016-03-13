@@ -8,12 +8,15 @@ class DatabaseI(object):
     
     TODO: check if this is actually required'''
     
-    def __init__(self, host, user, database, encoding='latin1'):
+    def __init__(self, host, user, database, password="", encoding='latin1'):
         self.host = host
         self.user = user
+        self.password = password
         self.database = database
         self.encoding = encoding
         self.conn = None
+        
+        #print(self.host,self.user, self.password, self.database)
         
     def connect(self):
         raise NotImplementedError()
@@ -68,8 +71,9 @@ class MySqlConn(DatabaseI):
         '''Generate a connection to a MySQL database.
         '''
         #self.conn.set_client_encoding(self.encoding)
-        self.conn = mysql.connector.connect(user=self.user, host=self.host, 
-                                database=self.database)
+        self.conn = mysql.connector.connect(user=self.user, host=self.host,
+                                            password=self.password, 
+                                            database=self.database)
         
     def closed(self):
         '''TODO -- don't think this function is correct'''
@@ -88,6 +92,7 @@ class MySqlConn(DatabaseI):
         
     def __exit__(self, _type, value, traceback):  
         if not self.closed():
+            print("exiting")
             self.conn.close()
        
     def __del__(self):        
