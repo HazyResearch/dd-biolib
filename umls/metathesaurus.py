@@ -1,3 +1,6 @@
+import sys
+#sys.path += ["../ddlite/"]
+
 import re
 import os
 import umls
@@ -397,18 +400,20 @@ class UmlsMatch(ddlite.Matcher):
     def __init__(self, label, match_attrib='words', 
                  semantic_types=[], source_vocab=[], 
                  max_ngr=4, ignore_case=True):
-        
+
+        # connect to UMLS dictionary
         self.conn = database.MySqlConn(umls.config.HOST, umls.config.USER, 
                                        umls.config.DATABASE, umls.config.PASSWORD)
         self.conn.connect()
         
+        # initialize semantic network to define core entity types
         self.semantic_network = umls.SemanticNetwork(self.conn)
         self.taxonomy = self.semantic_network.graph(relation="isa")
         
         self.label = label
         self.match_attrib = match_attrib
         self.source_vocab = source_vocab
-        #self.include_ancestors = include_ancestors TODO (is this a good idea??)
+     
         self.ignore_case = ignore_case
         self.ngr = range(0,max_ngr+1)
         
@@ -434,6 +439,7 @@ class UmlsMatch(ddlite.Matcher):
         # Make sure we're operating on a dict, then get match_attrib
         try:
             seq = s[self.match_attrib]
+            
         except TypeError:
             seq = s.__dict__[self.match_attrib]
     
@@ -450,6 +456,7 @@ class UmlsMatch(ddlite.Matcher):
                 if phrase in self._cache:
                     yield list(range(i, i+l))
                 else:
+                    # escape sql string
                     esc_phrase = re.sub("(['\"%])",r"\\\1",phrase)
                     q = sql % (esc_phrase)
                     results = self.conn.query(q)

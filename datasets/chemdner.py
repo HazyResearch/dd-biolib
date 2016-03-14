@@ -1,5 +1,5 @@
 import cPickle
-from ddlite import *
+#from ddlite import *
 from datasets import *
 from collections import namedtuple
 
@@ -13,6 +13,7 @@ class PubMedAbstract(object):
         self.body = body
         self._entities = {}
         
+        
 class ChemdnerCorpus(Corpus):
         
     def __init__(self, path, parser):
@@ -24,8 +25,35 @@ class ChemdnerCorpus(Corpus):
         
         self._load_files()
         
+    
+    def __getitem__(self,pmid):
+        """Use PMID as key and load parsed document object"""
         
-    def parse_docs(self):
+        
+        pkl_file = "%scache/%s.pkl" % (self.path,pmid)
+        
+        # load cached parse if it exists
+        if os.path.exists(pkl_file):
+            with open(pkl_file, 'rb') as f:
+                self.documents[pmid] = cPickle.load(f)
+        else:
+            title = [s for s in self.parser.parse(self.documents[pmid]["title"])]
+            body = [s for s in self.parser.parse(self.documents[pmid]["body"])]
+            self.documents[pmid]["sentences"] = title + body
+            with open(pkl_file, 'w+') as f:
+                cPickle.dump(self.documents[pmid], f)
+                print('wrote', pmid, "at", pkl_file)
+    
+        return self.documents[pmid]
+        
+    
+    def __iter__(self):
+        
+        for pmid in self.documents:
+            yield self.__getitem__(pmid)
+            
+        
+    def _load_files(self):
         '''
         ChemDNER corpus format (tab delimited)
         1- Article identifier (PMID)
@@ -35,29 +63,6 @@ class ChemdnerCorpus(Corpus):
         5- Text string of the entity mention
         6- Type of chemical entity mention (ABBREVIATION,FAMILY,FORMULA,IDENTIFIERS,MULTIPLE,SYSTEMATIC,TRIVIAL)
         '''
-        
-        pkl_cache = '%s/saved_sents.pkl' % self.path
-        try:
-            with open(pkl_cache, 'rb') as f:
-                self.documents = cPickle.load(f)
-       
-        except:
-            
-            for pmid in self.documents:
-                title = [s for s in self.parser.parse(self.documents[pmid]["title"])]
-                body = [s for s in self.parser.parse(self.documents[pmid]["body"])]
-                self.documents[pmid]["sentences"] = title + body
-            
-            # dump parsed sentences to a pickle file
-            with open(pkl_cache, 'w+') as f:
-                cPickle.dump(self.documents, f)
-        
-        for pmid in self.documents:
-            yield self.documents[pmid]["sentences"]
-        
-        
-    def _load_files(self):
-        # load documents
         filelist = [(x,"%s%s.abstracts.txt" % (self.path,x)) for x in self.cv.keys()]
         for cv,fname in filelist:
             docs = [d.strip().split("\t") for d in open(fname,"r").readlines()]
