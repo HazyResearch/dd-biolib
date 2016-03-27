@@ -1,22 +1,49 @@
 import cPickle
-#from ddlite import *
 from datasets import *
 from collections import namedtuple
+import sys
+
+
+def unescape_penn_treebank(words):
+    '''Replace PennTreeBank tags'''
+    repl = dict([('-LRB-','('), ('-RRB-',')'), ('-LCB-','{'), ('-RCB-','}'), ('-LSB-','['),('-RSB-',']')])
+    return [repl[w] if w in repl else w for w in words]
+
+def align(a, b):
+    '''Align sequences and return mapped offsets'''
+    j = 0
+    offsets = []
+    for i in range(0,len(a)):
+        if a[i] in [" "]:
+            continue
+      
+        matched = False
+        while not matched and j < len(b):
+            if a[i] == b[j]:
+                offsets += [(i,j,a[i],b[j])]
+                matched = True
+            j += 1
+            
+    return offsets
+
+def token_mapping(doc,tokens):
+        '''
+        Create a character-level mapping from a raw, unparsed document
+        to a parsed and tokenized document
+        '''  
+        tokenized = " ".join(reduce(lambda x,y:x+y,tokens))
+        offsets = align(tokenized, doc)
+        token_idx, doc_idx, token_ch, doc_ch = zip(*offsets)
+        
+        return dict(zip(doc_idx,token_idx))
+
 
 Annotation = namedtuple('Annotation', 'text_type start end text mention_type')
 
-class PubMedAbstract(object):
-
-    def __init__(self, pmid, title, body):
-        self.pmid = pmid
-        self.title = title
-        self.body = body
-        self._entities = {}
-        
         
 class ChemdnerCorpus(Corpus):
         
-    def __init__(self, path, parser):
+    def __init__(self, path, parser, cache_path="/Users/fries/Desktop/cache"):
         super(ChemdnerCorpus, self).__init__(path, parser)
         self.path = path
         self.cv = {"training":{},"development":{},"evaluation":{}}
@@ -24,13 +51,50 @@ class ChemdnerCorpus(Corpus):
         self.annotations = {}
         
         self._load_files()
+        self.cache_path = cache_path
+    
+    def __build_charmap(self,pmid):
+
+        if pmid not in self.annotations:
+            return {}
+        
+        doc = self.documents[pmid]["title"].strip() + " " + self.documents[pmid]["body"].strip()
+        tokenized = []
+        for sent in self.documents[pmid]["sentences"]:
+            tokenized += [unescape_penn_treebank(sent.words)]
+        
+        mapping = token_mapping(doc,tokenized)
+        
+        tokenized = " ".join([" ".join(sent) for sent in tokenized])
+        print doc
+        print tokenized
+         
+        '''
+        for sent in self.documents[pmid]["sentences"]:
+            for token in sent.words:
+                print token
+                span = (mapping[idx],mapping[idx]+len(token))
+                idx += len(token) + 1
+                print doc[span[0]:span[1]]
+                print
+            idx += 1
+        #offsets = align(fulltext," ".join(tokenized))
+        
+        #a_align,b_align,a_char,b_char = zip(*offsets)
+        #charmap = zip(a_align,b_align)
+        '''
+        ''' 
+        end = charmap[-1][0] + 1
+        print fulltext[:end]
+        
+        #idx = charmap[-1][0]+1
+        fulltext = fulltext[end:]
+        ''' 
         
     
     def __getitem__(self,pmid):
         """Use PMID as key and load parsed document object"""
-        
-        
-        pkl_file = "%scache/%s.pkl" % (self.path,pmid)
+        pkl_file = "%s/%s.pkl" % (self.cache_path, pmid)
         
         # load cached parse if it exists
         if os.path.exists(pkl_file):
@@ -40,9 +104,14 @@ class ChemdnerCorpus(Corpus):
             title = [s for s in self.parser.parse(self.documents[pmid]["title"])]
             body = [s for s in self.parser.parse(self.documents[pmid]["body"])]
             self.documents[pmid]["sentences"] = title + body
+            
+            # create mapping char_idx->token_idx
+            if self.annotations[pmid]:
+                self.__build_charmap(pmid)
+                sys.exit()
+                
             with open(pkl_file, 'w+') as f:
                 cPickle.dump(self.documents[pmid], f)
-                print('wrote', pmid, "at", pkl_file)
     
         return self.documents[pmid]
         
