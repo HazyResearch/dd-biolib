@@ -18,8 +18,8 @@ def get_mention_text(candidates):
 parser = SentenceParser()
 corpus = ChemdnerCorpus('../datasets/chemdner_corpus/', parser=parser, cache_path="/tmp/")
 
-pmids = [pmid for pmid in corpus.cv["training"].keys()]
-documents = {pmid:corpus[pmid]["sentences"] for pmid in pmids[0:100]}
+pmids = [pmid for pmid in corpus.cv["training"].keys()[:1000]]
+documents = {pmid:corpus[pmid]["sentences"] for pmid in pmids}
 sentences = reduce(lambda x,y:x+y, documents.values())
 print("Loaded %s training documents" % len(documents))
 
@@ -65,15 +65,16 @@ else:
 chemicals += d.keys()
 
 extr1 = DictionaryMatch('C', chemicals, ignore_case=True)
-extr2 = RegexMatch('C',regexes[0],ignore_case=True)
-extr3 = RegexMatch('C',regexes[1],ignore_case=False)
-
-embeddings = "/Users/fries/Desktop/chemdner_embeddings/embeddings/words.d128.w10.m0.i10.bin"
-extr4 = DistributionalSimilarityMatcher('C', embeddings, chemicals, 
-                                        knn=10, match_threshold=0.3, ignore_case=False)
+extr2 = RegexMatch('C',regexes[0], ignore_case=True)
+extr3 = RegexMatch('C',regexes[2], ignore_case=False)
 
 
-matcher = MultiMatcher(extr1,extr2,extr3,extr4)
+# slow -- also need to compute better embeddings
+#embeddings = "/Users/fries/Desktop/chemdner_embeddings/embeddings/words.d128.w10.m0.i10.bin"
+#extr4 = DistributionalSimilarityMatcher('C', embeddings, chemicals, 
+#                                        knn=10, match_threshold=0.3, ignore_case=False)
+
+matcher = MultiMatcher(extr3)
 
 
 n,N = 0.0, 0.0
@@ -86,10 +87,7 @@ for pmid in documents:
     if pmid not in corpus.annotations:
         continue
     
-    print candidates
-    print [m.text for m in corpus.annotations[pmid]]
-    
-    
+    #print [m.text for m in corpus.annotations[pmid]]
     mentions = get_mention_text(candidates)
     
     annotations = [m.text for m in corpus.annotations[pmid]]
@@ -98,16 +96,29 @@ for pmid in documents:
     for m in mentions:
         if m in annotations:
             annotations.remove(m)
-        
+  
     n += counter - len(annotations)
     N += counter
     missed += annotations
     cand_n += len(candidates)
-
+    
+    for sent in sentences:
+        sent = " ".join(sent.words)
+        if "β-funaltrexamine" in sent:
+            print sent
+    
+    
+    if mentions:
+        for m in  mentions:
+            print m
 
 missed = {term:missed.count(term) for term in missed}
+
+regex = re.compile("^[αβΓγΔδεϝζηΘθικΛλμνΞξοΠπρΣστυΦφχΨψΩω]+[-]")
 for term in missed:
-    print term #, missed[term]
+    if regex.match(term):
+        print "*",term
+#    print term #, missed[term]
   
 
 print n, N, len(missed)
