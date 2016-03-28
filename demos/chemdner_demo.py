@@ -1,43 +1,115 @@
+# -*- coding: utf-8 -*-
+import sys
 import umls
 from ddlite import *
 from datasets import *
+import codecs
+from lexicons.matchers import DistributionalSimilarityMatcher
+
+def de_corenlp(words):
+    repl = dict([('-LRB-','('), ('-RRB-',')'), ('-LCB-','{'), ('-RCB-','}'), ('-LSB-','['),('-RSB-',']')])
+    return [repl[w] if w in repl else w for w in words]
+
+def get_mention_text(candidates):
+    mentions = [de_corenlp([e.words[i] for i in e.idxs]) for e in candidates]
+    return [" ".join(m) for m in mentions]
 
 # ChemDNER Corpus v1.0
-parser = SentenceParser(absolute_path=True)
-corpus = ChemdnerCorpus('datasets/chemdner_corpus/',parser=parser)
+parser = SentenceParser()
+corpus = ChemdnerCorpus('../datasets/chemdner_corpus/', parser=parser, cache_path="/tmp/")
 
-documents = {pmid:corpus[pmid]["sentences"] for pmid in corpus.cv["training"].keys()[:10]}
+pmids = [pmid for pmid in corpus.cv["training"].keys()]
+documents = {pmid:corpus[pmid]["sentences"] for pmid in pmids[0:100]}
+sentences = reduce(lambda x,y:x+y, documents.values())
 print("Loaded %s training documents" % len(documents))
 
-# We can label candidates in two ways:
-# 1: Use a dictionary, either loaded from a text file
+# load gold annotation tags
+annotations = [corpus.annotations[pmid] for pmid in pmids if pmid in corpus.annotations]
+annotations = reduce(lambda x,y:x+y, annotations)
+annotations = [a.text for a in annotations]
+
+regex_fnames = ["../datasets/regex/chemdner/patterns.txt"]
+
+# dictionaries from tmChem
+dict_fnames = ["../datasets/dictionaries/chemdner/mention_chemical.txt",
+              "../datasets/dictionaries/chemdner/chebi.txt",
+              "../datasets/dictionaries/chemdner/addition.txt"]
+
+chemicals = []
+for fname in dict_fnames:
+    chemicals += [line.split("\t")[0] for line in open(fname,"rU").readlines()]
+
+regexes = []
+for fname in regex_fnames:
+    regexes += [line.strip() for line in open(fname,"rU").readlines()] 
+
+# build UMLS dictionary of substances (rather than query DB)
+dfile = "../datasets/dictionaries/umls/substance-sab-all.txt"
+if os.path.exists(dfile):
+    d = {term.strip():1 for term in open(dfile,"rU").readlines()}
+else:
+    meta = umls.Metathesaurus()
+    norm = umls.MetaNorm(function=lambda x:x.lower())
+    d = meta.dictionary("Substance")
+    d = map(norm.normalize,d)
+    print("Found %d distinct terms" % len(d))
+    with codecs.open(dfile,"w","utf-8") as f:
+        for term in d:
+            if term.strip() != "":
+                try:
+                    f.write(term)
+                    f.write("\n")
+                except:
+                    print term
+                    
+chemicals += d.keys()
+
+extr1 = DictionaryMatch('C', chemicals, ignore_case=True)
+extr2 = RegexMatch('C',regexes[0],ignore_case=True)
+extr3 = RegexMatch('C',regexes[1],ignore_case=False)
+
+embeddings = "/Users/fries/Desktop/chemdner_embeddings/embeddings/words.d128.w10.m0.i10.bin"
+extr4 = DistributionalSimilarityMatcher('C', embeddings, chemicals, 
+                                        knn=10, match_threshold=0.3, ignore_case=False)
 
 
-# 2: Or we can dynamically use the UMLS as our dictionary. The disadvantage
-# beyond a speed hit, is that the UMLS is noisy, resulting in a many false
-# positive matches that then need to be filtered out. 
-extractor1 = umls.UmlsMatch('C',semantic_types=["Substance"],ignore_case=True)
-#extractor2 = DictionaryMatch('C',ignore_case=True)
+matcher = MultiMatcher(extr1,extr2,extr3,extr4)
 
+
+n,N = 0.0, 0.0
+cand_n = 0
+missed = []
 for pmid in documents:
-    doc = documents[pmid]
-    entities = Entities(extractor1,doc)
+    sentences = documents[pmid]
+    candidates = [m for m in Entities(sentences,matcher)]
+    
+    if pmid not in corpus.annotations:
+        continue
+    
+    print candidates
+    print [m.text for m in corpus.annotations[pmid]]
     
     
-    #if pmid in corpus.annotations:
-    #    print [x.text for x in corpus.annotations[pmid] ]
+    mentions = get_mention_text(candidates)
+    
+    annotations = [m.text for m in corpus.annotations[pmid]]
+    counter = len(annotations)
+    
+    for m in mentions:
+        if m in annotations:
+            annotations.remove(m)
+        
+    n += counter - len(annotations)
+    N += counter
+    missed += annotations
+    cand_n += len(candidates)
 
 
+missed = {term:missed.count(term) for term in missed}
+for term in missed:
+    print term #, missed[term]
+  
 
-def rule1(s):
-    return 0
-
-def rule2(s):
-    return 1
-
-
-# Positive examples
-
-
-# Negative examples
-
+print n, N, len(missed)
+print "%.3f" % (n/N)
+print "candidates: %d" % cand_n

@@ -13,17 +13,20 @@ def clean(d):
 
 
 
-doc_string = "Ten female pigs (Danish Landrace breed, weighing from 67 to 77 kg) were used. On day 0, trauma-induced implant-associated S. aureus osteomyelitis was induced in the proximal metaphysis of the right tibia. Postoperatively, the pigs received buprenorphine (Temgesic; 0.02 mg/kg intramuscularly) twice, with an eight-hour interval, and eight hours after the last injection of Temgesic, the analgesia was maintained with meloxicam (Metacam; 0.3 mg/kg by mouth) every twenty-four hours. Five days later, measurements of cefuroxime were conducted using microdialysis in the implant-related bone cavity, adjacent infected cancellous bone, and infected subcutaneous tissue as well as in the healthy cancellous bone and subcutaneous tissue in the contralateral leg. Bone measurements were obtained in drill-holes. For comparison, measurements of the corresponding plasma concentration were also obtained. When the last samples were collected, the animals were killed using pentobarbital."
+#doc_string = "Ten female pigs (Danish Landrace breed, weighing from 67 to 77 kg) were used. On day 0, trauma-induced implant-associated S. aureus osteomyelitis was induced in the proximal metaphysis of the right tibia. Postoperatively, the pigs received buprenorphine (Temgesic; 0.02 mg/kg intramuscularly) twice, with an eight-hour interval, and eight hours after the last injection of Temgesic, the analgesia was maintained with meloxicam (Metacam; 0.3 mg/kg by mouth) every twenty-four hours. Five days later, measurements of cefuroxime were conducted using microdialysis in the implant-related bone cavity, adjacent infected cancellous bone, and infected subcutaneous tissue as well as in the healthy cancellous bone and subcutaneous tissue in the contralateral leg. Bone measurements were obtained in drill-holes. For comparison, measurements of the corresponding plasma concentration were also obtained. When the last samples were collected, the animals were killed using pentobarbital."
+doc_string = "The primer sequences for AT1R (GenBank no. NM_000685) and AT2R (GenBank no. NM_000685.)"
 
-doc = cPickle.load(open("/Users/fries/Desktop/doc.pkl","r"))
 
-'''
+
+#doc = cPickle.load(open("/Users/fries/Desktop/doc.pkl","r"))
+
 parser = SentenceParser()
 sentences = []
 for sent in parser.parse(doc_string):
     sentences += [sent]
 cPickle.dump(sentences,open("/users/fries/desktop/doc.pkl","wb"))
-'''
+
+sys.exit()
 
 extractor = umls.UmlsMatch('A',semantic_types=["Substance"],ignore_case=True)
 

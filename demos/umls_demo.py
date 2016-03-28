@@ -48,12 +48,10 @@ for node in root_nodes:
 print( meta.semantic_network.groups["Anatomy"] )
 
 
-sys.exit()
-
 
 # UMLS normalizes concepts with a CUI (Concept Unique Identifier)
 # e.g., C0002645 is 'Amoxycillin'
-concept = meta.concept(cui='C0002645') 
+concept = meta.concept(cui='C3539739') 
 concept.print_summary()
 
 # List all relations on a specific concept
@@ -63,11 +61,14 @@ print(rel)
 
 # Search for concepts (CUIs) by string. This is a noisy match. We don't perform
 # any disambiguation so CUIs are not guaranteed to actually be related.
-matches = meta.match_concepts("Denys-Drash syndrome", match_substring=False) 
+matches = meta.match_concepts("Cu", match_substring=False) 
 print("Found %d string->concept matches" % len(matches))
 for cui in matches:
     concept = meta.concept(cui=cui) 
     concept.print_summary()
+
+
+sys.exit()
 
 #
 # Building Dictionaries and Relation Tuples
@@ -79,29 +80,36 @@ print(meta.get_source_vocabulary_defs())
 print(sorted(meta.get_semtypes_list()))
 print(sorted(meta.get_relations_list()))
 '''
-    
+'''
 # Build dictionaries for a given semantic type (i.e., entity)
 d = meta.dictionary("Disease or Syndrome")
 d = map(norm.normalize,d)
 for term in sorted(d,key=lambda x:len(x.split()),reverse=1):
     print(term)
+'''
 
-
-
-sys.exit()
 
 # Generate relation examples from given semantic types. This is 
 # highly dependent on the choice of source vocabulary. 
-relations = meta.relations("Substance","Biologic Function","may_treat")
+attribute ="may_prevent"
+relations = meta.relations("Substance","Biologic Function",attribute)
 print("Found %d distinct relation pairs" % len(relations))
 
 # Print concept terms (this can be expanded by using concept.all_terms() 
 # rather than just the preferred term).
 for cui1,cui2 in relations:
-    terms_cui1 = map(norm.normalize, meta.concept(cui1).preferred_term())[0]
-    terms_cui2 = map(norm.normalize, meta.concept(cui2).preferred_term())[0]
-    print((cui1,cui2), terms_cui1, "->", terms_cui2)
-
+    #terms_cui1 = map(norm.normalize, meta.concept(cui1).preferred_term())[0]
+    #terms_cui2 = map(norm.normalize, meta.concept(cui2).preferred_term())[0]
+    
+    terms_cui1 = map(norm.normalize, meta.concept(cui1).all_terms())
+    terms_cui2 = map(norm.normalize, meta.concept(cui2).all_terms())
+    
+    terms_cui1 = "|".join(terms_cui1)
+    terms_cui2 = "|".join(terms_cui2)
+    
+    row= [cui1, terms_cui1, attribute, cui2, terms_cui2 ]
+    #print((cui1,cui2), terms_cui1, "->", terms_cui2)
+    print("\t".join(row).encode("utf-8",errors="ignore"))
 
 
 
