@@ -67,23 +67,22 @@ class ChemdnerCorpus(Corpus):
     def __getitem__(self,pmid):
         """Use PMID as key and load parsed document object"""
         pkl_file = "%s/%s.pkl" % (self.cache_path, pmid)
-        
         # load cached parse if it exists
         if os.path.exists(pkl_file):
             with open(pkl_file, 'rb') as f:
                 self.documents[pmid] = cPickle.load(f)
         else:
+            self.documents[pmid]["title"] = self.documents[pmid]["title"].decode("utf-8")
+            self.documents[pmid]["body"] = self.documents[pmid]["body"].decode("utf-8")
+            
             title = [s for s in self.parser.parse(self.documents[pmid]["title"])]
             body = [s for s in self.parser.parse(self.documents[pmid]["body"])]
             self.documents[pmid]["sentences"] = title + body
-            
-            # create mapping char_idx->token_idx
-            #if self.annotations[pmid]:
-            #    self.__build_charmap(pmid)
-                
+             
             with open(pkl_file, 'w+') as f:
                 cPickle.dump(self.documents[pmid], f)
-    
+                
+        #print self.documents[pmid]["sentences"]
         return self.documents[pmid]
         
     

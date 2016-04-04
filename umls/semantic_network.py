@@ -22,7 +22,7 @@ class SemanticNetwork(object):
         
         if not conn:
             self.conn = database.MySqlConn(umls.config.HOST, umls.config.USER, 
-                                       umls.config.DATABASE, umls.config.PASSWOPD)
+                                       umls.config.DATABASE, umls.config.PASSWORD)
             self.conn.connect()
         else:
             self.conn = conn
@@ -86,6 +86,3 @@ class SemanticNetwork(object):
         return self._networks[relation]
     
    
-        
-        
-

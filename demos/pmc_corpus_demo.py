@@ -1,12 +1,37 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import sys
 from ddlite import *
 from datasets import PubMedCentralCorpus
+import codecs
 
 #
 # PubMedCentral Corpus
 #
 inputdir = "/Users/fries/Desktop/pmc/"
 parser = SentenceParser()
-corpus = PubMedCentralCorpus(inputdir, parser, cache_path="/tmp")
+#corpus = PubMedCentralCorpus(inputdir, parser, cache_path="/tmp")
+
+
+s = u"The growth of Staphylococcus aureus with the IC50 value of Staphylococcus aureus with the IC50 value of 87.81 µg mL(-1)."
+sentences = [x for x in parser.parse(s)]
+for s in sentences:
+    print " ".join(s.words)
+sys.exit()
+
+corpus = [x.strip().split("\t") for x in open("/Users/fries/Code/dd-biolib/datasets/chemdner_corpus/training.abstracts.txt","rU").readlines()]
+
+for s in corpus:
+    
+    try:
+        doc = parser.parse(s[2].decode("ascii").encode("utf-8"))
+        for sent in doc:
+            print sent
+    except Exception as e:
+        print e
+        sys.exit()
+
 
 # we iterate through documents
 for i,doc in enumerate(corpus):

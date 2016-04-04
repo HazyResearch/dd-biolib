@@ -331,7 +331,7 @@ class Concept(object):
             tty,string,ispref = row
             self._terms[string] = tty
             
-        print(self._terms.keys()) 
+        #print(self._terms.keys()) 
                
     def definition(self,source_vocab=[]):
         """There are often multiple definitions conditioned on source vocabulary."""
@@ -426,6 +426,15 @@ class UmlsMatch(ddlite.Matcher):
         
         self._cache = {}
         
+        # replace CoreNLP/PennTreekBank
+        self.repl = dict([('-LRB-','('), ('-RRB-',')'), ('-LCB-','{'), 
+                                 ('-RCB-','}'), ('-LSB-','['),('-RSB-',']')])
+        
+        # UMLS doesn't use unicode greek letters, so expand to ASCII form
+        greek_letters = [x.strip().split("\t") for x in 
+                         open("%s/data/GreekLetters.txt" % module_path,"rU").readlines()]
+        self.repl.update(dict(greek_letters))
+        
         
     def apply(self,s):
         '''Match all semantic types by default
@@ -443,6 +452,12 @@ class UmlsMatch(ddlite.Matcher):
         except TypeError:
             seq = s.__dict__[self.match_attrib]
     
+        # normalize sentence, replacing PennTreeBank tags and Greek letters
+        phrase = " ".join(seq)
+        for token in self.repl:
+            phrase = phrase.replace(token,self.repl[token])
+        seq = phrase.split()
+               
         # Loop over all ngrams
         for l in self.ngr:
             for i in range(0, len(seq)-l+1):
@@ -454,13 +469,13 @@ class UmlsMatch(ddlite.Matcher):
                 # Queries are case insensitive by default.
                 # HACK: check matched strings 
                 if phrase in self._cache:
-                    yield list(range(i, i+l))
+                    yield list(range(i, i+l)), self.label
                 else:
                     # escape sql string
                     esc_phrase = re.sub("(['\"%])",r"\\\1",phrase)
                     q = sql % (esc_phrase)
                     results = self.conn.query(q)
-                        
+                    
                     if (results and self.ignore_case) or phrase in [x[2] for x in results]:
                         self._cache[phrase] = 1
-                        yield list(range(i, i+l))
+                        yield list(range(i, i+l)), self.label
