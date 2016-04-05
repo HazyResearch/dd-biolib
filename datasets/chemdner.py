@@ -6,7 +6,6 @@ from utils import unescape_penn_treebank
 
 Annotation = namedtuple('Annotation', ['text_type','start','end','text','mention_type'])
 
-       
 class ChemdnerCorpus(Corpus):
         
     def __init__(self, path, parser, cache_path="/tmp/"):
@@ -35,99 +34,60 @@ class ChemdnerCorpus(Corpus):
             body = [s for s in self.parser.parse(self.documents[pmid]["body"])]
             
             # initialize annotations   
+            self.documents[pmid]["tags"] = []
+            self.documents[pmid]["sentences"] = title + body
+            
             if pmid in self.annotations:
                 title_labels = [label for label in self.annotations[pmid] if label.text_type=='T']
                 body_labels = [label for label in self.annotations[pmid] if label.text_type=='A']
-                
-                #self._label(title_labels,title)
-                self._label(body_labels,body)
-                
-            #self.documents[pmid]["title-sentences"] = title
-            #self.documents[pmid]["body-sentences"] = body
-            self.documents[pmid]["sentences"] = title + body
-             
-            #with open(pkl_file, 'w+') as f:
-            #    cPickle.dump(self.documents[pmid], f)
-        
-        
-        
-        
+                self.documents[pmid]["tags"] = self._label(title_labels,title)
+                self.documents[pmid]["tags"] += self._label(body_labels,body)
+            else:
+                self.documents[pmid]["tags"] += [[] for _ in range(len(self.documents[pmid]["sentences"]))]
+ 
+            with open(pkl_file, 'w+') as f:
+                cPickle.dump(self.documents[pmid], f)
         
         return self.documents[pmid]
         
     
     def _label(self,annotations,sentences):
-        
-        if not annotations:
-            return []
+        '''Convert annotations from ChemNDER offsets to parsed token offsets. 
+        NOTE: This isn't perfect, since tokenization can fail to correctly split
+        some tags. 
+        '''
+        tags = [[] for i,_ in enumerate(sentences)]
         
         sents = {min(sent.token_idxs):sent for sent in sentences}
         sent_offsets = sorted(sents)
         
         for label in annotations:
-            for i in range(len(sent_offsets)-1):
-                # find target setnence
-                start,end = sent_offsets[i],sent_offsets[i+1]   
-                if label.start >= start and label.start < end:
-                    
-                    span = [label.start, label.start + len(label.text)]
-                    
-                    print label.text
-                    #print span
-                    #print sents[start].token_idxs
+            # find target sentence
+            for i in range(len(sent_offsets)):
+                start = sent_offsets[i]  
+                end = sents[start].token_idxs[-1] + 1
                 
-                    # determine sub-span match
+                if label.start >= start and label.start < end:
+                    span = [label.start, label.start + len(label.text)]
+                    # determine span match
                     idx = -1
                     s_end = sents[start].token_idxs[-1]
                     while s_end >= span[1]:
                         idx = idx - 1
                         s_end = sents[start].token_idxs[idx]
-                    print "*", s_end
-                    
-                    #idx = idx - 1
+                
                     s_start = sents[start].token_idxs[idx]
                     while s_start > span[0]:
                         idx = idx - 1
                         s_start = sents[start].token_idxs[idx]  
-                        
-                    #print s_start,s_end
                     
                     ii = sents[start].token_idxs.index(s_start)
                     jj = sents[start].token_idxs.index(s_end)
-                    print sents[start].words[ii:jj+1]
-                    print "=========================="
-                    
-                    '''
-                    # subtoken span -- tokenization isn't correct
-                    if label.start not in sents[start].token_idxs:
-                        
-                        # determine subspan match
-                        idx = -1
-                        s_end = sents[start].token_idxs[-1]
-                        while s_end > span[1]:
-                            idx = idx - 1
-                            s_end = sents[start].token_idxs[idx]
-                        
-                        idx = idx - 1
-                        s_start = sents[start].token_idxs[idx]
-                        while s_start > span[0]:
-                            idx = idx - 1
-                            s_start = sents[start].token_idxs[idx]  
-                            
-                        print s_start,s_end
-                    
-                    else:
-                        print " ".join(sents[start].words)
-                        print sents[start].token_idxs
-                        print label.text
-                        print span
-                     '''   
-                             
-                        
-                        
-                        
-        
-    
+                    tags[i] += [ (label.text,(ii,jj+1)) ]
+                 
+        return tags           
+
+
     def __iter__(self):
         for pmid in self.documents:
             yield self.__getitem__(pmid)

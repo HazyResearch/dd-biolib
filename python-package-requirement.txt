@@ -1,4 +1,5 @@
 networkx
 mysql-connector-python
 psycopg2
-spacy
+sklearn
+gensim

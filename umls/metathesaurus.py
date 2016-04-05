@@ -1,6 +1,4 @@
 import sys
-#sys.path += ["../ddlite/"]
-
 import re
 import os
 import umls
@@ -76,8 +74,8 @@ class Metathesaurus(object):
             return self._networks[key]
         
         # source vocabulary (override class default)
-        sab = self.__source_vocab_sql(source_vocab) if source_vocab else \
-              self.__source_vocab_sql(self.source_vocab)
+        sab = self._source_vocab_sql(source_vocab) if source_vocab else \
+              self._source_vocab_sql(self.source_vocab)
         sab = "" if not sab else sab + " AND"
         
         rel_types ="(%s)" % " OR ".join(["REL='%s'" % rel for rel in relation])
@@ -97,7 +95,7 @@ class Metathesaurus(object):
         return G
         
         
-    def __source_vocab_sql(self,source_vocab):
+    def _source_vocab_sql(self,source_vocab):
         """Build source vocabulary sql"""
         if source_vocab:
             sab = " OR ".join(["SAB='%s'" % x for x in source_vocab])
@@ -152,9 +150,9 @@ class Metathesaurus(object):
         
         # override object default source vocabulary?
         if source_vocab:
-            sab = self.__source_vocab_sql(source_vocab)
+            sab = self._source_vocab_sql(source_vocab)
         else:
-            sab = self.__source_vocab_sql(self.source_vocab)
+            sab = self._source_vocab_sql(self.source_vocab)
         sab = "" if not sab else sab + " AND"
         sql = sql % (sab,s)
         
@@ -198,9 +196,9 @@ class Metathesaurus(object):
         
         # override object default source vocabulary?
         if source_vocab:
-            sab = self.__source_vocab_sql(source_vocab)
+            sab = self._source_vocab_sql(source_vocab)
         else:
-            sab = self.__source_vocab_sql(self.source_vocab)
+            sab = self._source_vocab_sql(self.source_vocab)
         
         tty = "" if not ignore_tty else "(%s)" % " AND ".join(map(lambda x:"TTY!='%s'" % x, ignore_tty))
         terms = " AND ".join([x for x in [sab,tty] if x])
@@ -237,9 +235,9 @@ class Metathesaurus(object):
         
         # override object default source vocabulary?
         if source_vocab:
-            sab = self.__source_vocab_sql(source_vocab)
+            sab = self._source_vocab_sql(source_vocab)
         else:
-            sab = self.__source_vocab_sql(self.source_vocab)
+            sab = self._source_vocab_sql(self.source_vocab)
         sab = "" if not sab else sab + " AND"
         
         sql = sql %  (sab,cui,cui)
@@ -266,9 +264,9 @@ class Metathesaurus(object):
         
         # override object default source vocabulary?
         if source_vocab:
-            sab = self.__source_vocab_sql(source_vocab)
+            sab = self._source_vocab_sql(source_vocab)
         else:
-            sab = self.__source_vocab_sql(self.source_vocab)
+            sab = self._source_vocab_sql(self.source_vocab)
         sab = "" if not sab else sab + " AND"
         
         sql = """

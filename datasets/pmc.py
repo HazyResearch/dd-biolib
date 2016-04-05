@@ -69,7 +69,6 @@ class PubMedCentralCorpus(Corpus):
         pkl_file = "%s/%s.pkl" % (self.cache_path,uid.split("/")[-1]) if self.cache_path else None
         
         if pkl_file and os.path.exists(pkl_file):
-            print "load"
             with open(pkl_file, 'rb') as f:
                 document = cPickle.load(f)
                 
@@ -89,22 +88,25 @@ class PubMedCentralCorpus(Corpus):
     def _preprocess(self,document):  
         
         if "abstract-text" in document:
-            content = document["abstract-text"].encode("utf-8","ignore")
+            content = document["abstract-text"]#.decode("utf-8","ignore").encode("utf-8")
+            #print(type(content))
             document["abstract"] = [s for s in self.parser.parse(content)]
         
         if "abstract-short-text" in document:
-            content = document["abstract-short-text"].encode("utf-8","ignore")
+            content = document["abstract-short-text"]#.encode("utf-8","ignore")
             document["abstract-short"] = [s for s in self.parser.parse(content)]
         
         document["sections"] = []
         for section in document["section-text"]:
             section = section.strip()
             try:
-                section = [s for s in self.parser.parse(section.encode("utf-8","ignore"))]
+                section = [s for s in self.parser.parse(section)] #.encode("utf-8","ignore")
                 document["sections"] += [section]
-            except:
-                print "CoreNLP parsing exception %s" % section       
-        
+            except Exception as e:
+                print "CoreNLP parsing exception %s" % section     
+                print e  
+                #sys.exit()
+                
         # merge all sentences into a single array
         document["sentences"] = []
         if "abstract" in document:
