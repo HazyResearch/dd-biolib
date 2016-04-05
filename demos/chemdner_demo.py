@@ -6,6 +6,7 @@ from ddlite import *
 from datasets import *
 from utils import unescape_penn_treebank
 from lexicons.matchers import DistributionalSimilarityMatcher
+import operator
 
 def rule_tokenizer(s):
     
@@ -23,47 +24,32 @@ class RuleTokenizedDictionaryMatch(DictionaryMatch):
                                                              'words', ignore_case)
         self.tokenizer = tokenizer
         
-    def _create_mapping(self,seq1,seq2):
-        assert "".join(seq1) == "".join(seq2)
-        pass
-        
     def align(self, a, b):
         
-        if not "".join(a) == "".join(b):
-            print " ".join(a)
-            print "".join(a)
-            print "".join(b)
+        #if len(a_offsets) != len(b_offsets):
+        a_offsets = reduce(lambda x,y:x+y,[[i] * len(w) for i,w in enumerate(a)])
+        b_offsets = reduce(lambda x,y:x+y,[[i] * len(w) for i,w in enumerate(b)])
         
-        assert "".join(a) == "".join(b)
-        
-        a = " ".join(a)
-        b = " ".join(b)
-
-        j = 0
-        offsets = []
-        for i in range(0,len(a)):
-            if a[i] in [" "]:
-                continue
-            matched = False
+        mapping = {}
+        for i,j in zip(a_offsets,b_offsets):
+            if i not in mapping:
+                mapping[i] = {}
+            mapping[i][j] = 1
             
-            while not matched and j < len(b):
-                if a[i] == b[j]:
-                    offsets += [(i,j,a[i],b[j])]
-                    matched = True
-                j += 1
-                
-        return offsets
+        return {i:mapping[i].keys() for i in mapping}
+        
     
     def apply(self, s):
+        '''
+        # create offset mapping between chars and tokens
+        # parser token offsets mapping top rule offsets. 
+        '''
         # apply tokenizer to raw text
         seq = self.tokenizer(s.text.strip())
-        # create offset mapping between chars and tokens
         offsets = [idx - s.token_idxs[0] for idx in s.token_idxs]
         tokens = unescape_penn_treebank(s.words)
-        
-        
-        mapping = self.align(tokens,seq)
-        print mapping
+        mapping = self.align(seq,tokens)
+                
         # Loop over all ngrams
         for l in self.ngr:
             for i in range(0, len(seq)-l+1):
@@ -75,24 +61,63 @@ class RuleTokenizedDictionaryMatch(DictionaryMatch):
                     print(phrase)
                     print("OFFSET"," ".join(s.words[i:i+l]))
                     print(" ".join(seq[i:i+l]))
+                    
+                    offsets = reduce(lambda x,y:x+y,[mapping[idx] for idx in range(i, i+l)])
+                    print min(offsets),max(offsets)
+                    print tokens[min(offsets):max(offsets)+1]
                     print("-----")
                     '''
-                    yield list(range(i, i+l)), self.label
+                    offsets = reduce(lambda x,y:x+y,[mapping[idx] for idx in range(i, i+l)])
+                    yield list(range(min(offsets), max(offsets)+1)), self.label
+                    #yield list(range(i, i+l)), self.label
 
 
 # ==========================================================================================
 
 # parse our corpus, saving CoreNLP results at cache_path
 parser = SentenceParser()
-corpus = ChemdnerCorpus('../datasets/chemdner_corpus/', parser=parser, cache_path="/users/fries/desktop/cache/")
+corpus = ChemdnerCorpus('../datasets/chemdner_corpus/', parser=parser, 
+                        cache_path="/users/fries/desktop/cache/")
+
+train_set = [pmid for pmid in corpus.cv["training"].keys()[:100]]
+#dev_set = [pmid for pmid in corpus.cv["development"].keys()[:100]]
+
+'''
+d = {}
+for pmid in train_set:
+    annotations = corpus.annotations[pmid] if pmid in corpus.annotations else []
+    d.update({label.text:1 for label in  annotations})
+
+for word in d:
+    print word
+'''
+'''
+for pmid in train_set:
+    sentences = corpus[pmid]["sentences"]
+    annotations = corpus.annotations[pmid] if pmid in corpus.annotations else []
+    print len(sentences)
+    print len(annotations)
+    print [s.token_idxs for s in sentences]
+    if annotations:
+        print annotations[0]
+'''
+for pmid in train_set:
+    sentences = corpus[pmid]["sentences"]
+    for sent in sentences:
+        if "DINCH" in sent.text:
+            print sent.text
+            print " ".join(sent.words)
+            
+sys.exit()
+
 
 # load the first 100 training documents and collapse all sentences into a single list
-pmids = [pmid for pmid in corpus.cv["training"].keys()[:100]]
-documents = {pmid:corpus[pmid]["sentences"] for pmid in pmids}
+
+documents = {pmid:corpus[pmid]["sentences"] for pmid in train_set}
 sentences = reduce(lambda x,y:x+y, documents.values())
 
 # load gold annotation tags
-annotations = [corpus.annotations[pmid] for pmid in pmids if pmid in corpus.annotations]
+annotations = [corpus.annotations[pmid] for pmid in train_set if pmid in corpus.annotations]
 annotations = reduce(lambda x,y:x+y, annotations)
 annotations = [a.text for a in annotations]
 
@@ -105,13 +130,18 @@ print("%d tokens" % word_n)
 
 
 
+
+
+
+
 regex_fnames = ["../datasets/regex/chemdner/patterns.txt"]
 
 # dictionaries from tmChem & the UMLS
 dict_fnames = ["../datasets/dictionaries/chemdner/mention_chemical.txt",
               "../datasets/dictionaries/chemdner/chebi.txt",
               "../datasets/dictionaries/chemdner/addition.txt",
-              "../datasets/dictionaries/umls/substance-sab-all.txt"]
+              "../datasets/dictionaries/umls/substance-sab-all.txt",
+              "../datasets/dictionaries/chemdner/train.chemdner.vocab.txt"]
 
 chemicals = []
 for fname in dict_fnames:
@@ -122,13 +152,13 @@ for fname in regex_fnames:
     regexes += [line.strip() for line in open(fname,"rU").readlines()]   
 
 # create matchers and extract candidates
-#extr1 = DictionaryMatch('C', chemicals, ignore_case=True)
-extr1 = RuleTokenizedDictionaryMatch('C', chemicals, ignore_case=True, tokenizer=rule_tokenizer)
+extr1 = DictionaryMatch('C', chemicals, ignore_case=True)
+extr2 = RuleTokenizedDictionaryMatch('C', chemicals, ignore_case=True, tokenizer=rule_tokenizer)
 #extr2 = AllUpperNounsMatcher('C')
 #extr3 = RegexMatch('C', regexes[0], ignore_case=True)
 #extr4 = RegexMatch('C', regexes[1], ignore_case=False)
 #extr5 = RegexMatch('C', regexes[2], ignore_case=False)
-matcher = MultiMatcher(extr1)#,extr2)#, extr3, extr4, extr5)
+matcher = MultiMatcher(extr2)#, extr2) #, extr4, extr5)
 
 candidates = Entities(sentences, matcher)
 
@@ -147,8 +177,15 @@ print("Annotations %.2f%% of all tokens" % (len(annotations)/float(word_n) * 100
 
 print("~recall: %.2f (%d/%d)" % (float(tp) / len(annotations), tp, len(annotations)))
 
-for m in mentions:
-    print(m)
+#for m in mentions:
+#    print(m)
+
+mentions = {term:1 for term in mentions}
+missed = [term for term in annotations if term not in mentions]
+missed = {term:missed.count(term) for term in missed}
+
+for term in sorted(missed.items(),key=operator.itemgetter(1),reverse=1):
+    print("%s: %d" % (term[0], missed[term[0]]))
 
 sys.exit()
 
