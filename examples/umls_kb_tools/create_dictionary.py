@@ -10,6 +10,7 @@ UMLS Metathesaurus Dictionary Builder
 '''
 from __future__ import print_function
 
+import re
 import umls
 import argparse
 from sklearn.neighbors import *
@@ -57,7 +58,10 @@ def main(args):
         dictionary = {t:1 for t in dictionary}
         terms = term_expansion(args.embeddings, dictionary, args.knn)
         dictionary = {t:1 for t in terms if t not in dictionary and t.lower() not in dictionary}.keys()
-        
+    
+    # remove terms that are just digits
+    dictionary = [term for term in dictionary if not re.match("^\d+[.]*\d*$",term)]
+    
     for term in sorted(dictionary,key=lambda x:len(x.split()),reverse=1):
         print(term.encode("utf-8"))
     

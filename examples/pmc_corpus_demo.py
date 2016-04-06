@@ -1,19 +1,35 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
 from ddlite import *
+import itertools
 from datasets import PubMedCentralCorpus
 
 #
 # PubMedCentral Corpus
 #
-inputdir = "/Users/fries/Dropbox/deepdive-biomed/corpora/pmc_orthopedics_subset/"
+inputdir = "../datasets/pmc_orthopedics_subset/"
 parser = SentenceParser()
-corpus = PubMedCentralCorpus(inputdir, parser, cache_path="/users/fries/desktop/pmc_cache/")
+corpus = PubMedCentralCorpus(inputdir, parser, cache_path="cache/pmc_ortho/")
 
-for i,doc in enumerate(corpus):
-    for sentence in doc["sentences"]:
-        pass
-          
+sentences = [corpus[uid]["sentences"] for uid in corpus.documents.keys()[0:10]]
+sentences = list(itertools.chain.from_iterable(sentences))
+
+# matchers
+dictfile = "../datasets/dictionaries/umls/anatomy.txt"
+anatomy = [line.strip().split("\t")[0] for line in open(dictfile,"rU").readlines()]
+matcher = DictionaryMatch('C', anatomy, ignore_case=True)
+
+# dump candidates
+candidates = Entities(sentences, matcher)
+candidates.dump_candidates("cache/pmc-ortho-candidates.pkl")
+
+print "Found %d candidates" % len(candidates)
+for i in range(100):
+    print candidates[i]
+
+
+#
+# If you need specifc parts of the PMC XML document, use these iteration patterns
+#
+'''        
 # look at specific metadata
 for i,doc in enumerate(corpus):
     for attribute in doc["metadata"]:
@@ -27,3 +43,4 @@ for i,doc in enumerate(corpus):
         for sentence in section:
             print "******%s******" % title, sentence 
     break
+'''

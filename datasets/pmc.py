@@ -31,8 +31,8 @@ class PubMedAbstractCorpus(Corpus):
             with open(pkl_file, 'rb') as f:
                 self.documents[pmid] = cPickle.load(f)
         else:
-            title = [s for s in self.parser.parse(self.documents[pmid]["title"])]
-            body = [s for s in self.parser.parse(self.documents[pmid]["body"])]
+            title = [s for s in self.parser.parse(self.documents[pmid]["title"].decode("utf-8"))]
+            body = [s for s in self.parser.parse(self.documents[pmid]["body"].decode("utf-8"))]
             self.documents[pmid]["sentences"] = title + body
             with open(pkl_file, 'w+') as f:
                 cPickle.dump(self.documents[pmid], f)
@@ -88,33 +88,30 @@ class PubMedCentralCorpus(Corpus):
     def _preprocess(self,document):  
         
         if "abstract-text" in document:
-            content = document["abstract-text"]#.decode("utf-8","ignore").encode("utf-8")
-            #print(type(content))
+            content = document["abstract-text"]
             document["abstract"] = [s for s in self.parser.parse(content)]
-        
+            
         if "abstract-short-text" in document:
-            content = document["abstract-short-text"]#.encode("utf-8","ignore")
+            content = document["abstract-short-text"]
             document["abstract-short"] = [s for s in self.parser.parse(content)]
-        
+            
         document["sections"] = []
         for section in document["section-text"]:
-            section = section.strip()
             try:
-                section = [s for s in self.parser.parse(section)] #.encode("utf-8","ignore")
+                section = [s for s in self.parser.parse(section.strip())]
                 document["sections"] += [section]
+                
             except Exception as e:
                 print "CoreNLP parsing exception %s" % section     
-                print e  
-                #sys.exit()
-                
-        # merge all sentences into a single array
+        
+        
         document["sentences"] = []
-        if "abstract" in document:
-            for section in document["abstract"]:
-                document["sentences"] += section
-            
+        #if "abstract" in document:
+        #    for section in document["abstract"]:
+        #        document["sentences"] += section
+         
         for section in document["sections"]:
-            document["sentences"] += section
+            document["sentences"] += [s for s in section]
         
         
     def _parse_xml(self,uid):
@@ -163,7 +160,7 @@ class PubMedCentralCorpus(Corpus):
                 content = []
                 abstract_name = "abstract-text"
                 if node.attrib and "abstract-type" in node.attrib:
-                    abstract_name = "abstract-short-text" # % node.attrib["abstract-type"]
+                    abstract_name = "abstract-short-text"
                 
                 for sec in node.iter('*'):
                     if not sec.text:
