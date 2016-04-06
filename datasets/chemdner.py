@@ -20,8 +20,9 @@ class ChemdnerCorpus(Corpus):
         
         self._load_files()
         self.cache_path = cache_path
+        if not os.path.exists(cache_path):
+            pass
      
-        
     def __getitem__(self,pmid):
         """Use PMID as key and load parsed document object"""
         pkl_file = "%s/%s.pkl" % (self.cache_path, pmid)
@@ -53,8 +54,7 @@ class ChemdnerCorpus(Corpus):
                 cPickle.dump(self.documents[pmid], f)
         
         return self.documents[pmid]
-        
-    
+           
     def _label(self,annotations,sentences):
         '''Convert annotations from ChemNDER offsets to parsed token offsets. 
         NOTE: This isn't perfect, since tokenization can fail to correctly split
@@ -91,12 +91,10 @@ class ChemdnerCorpus(Corpus):
                  
         return tags           
 
-
     def __iter__(self):
         for pmid in self.documents:
             yield self.__getitem__(pmid)
-            
-        
+              
     def _load_files(self):
         '''
         ChemDNER corpus format (tab delimited)
@@ -112,7 +110,7 @@ class ChemdnerCorpus(Corpus):
             docs = [d.strip().split("\t") for d in codecs.open(fname,"r",self.encoding).readlines()]
             docs = {pmid:{"title":title,"body":body} for pmid,title,body in docs}
             self.cv[cv] = {pmid:1 for pmid in docs} 
-            self.documents.update(docs)
+            self.documentsw.update(docs)
         
         # load annotations
         filelist = [(x,"%s%s.annotations.txt" % (self.path,x)) for x in self.cv.keys()]
