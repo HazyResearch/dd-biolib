@@ -1,7 +1,8 @@
+import sys
+import codecs
 import cPickle
 from datasets import *
 from collections import namedtuple
-import sys
 from utils import unescape_penn_treebank
 
 Annotation = namedtuple('Annotation', ['text_type','start','end','text','mention_type'])
@@ -14,6 +15,8 @@ class ChemdnerCorpus(Corpus):
         self.cv = {"training":{},"development":{},"evaluation":{}}
         self.documents = {}
         self.annotations = {}
+        self.encoding = "utf-8"
+        self.verbose = True
         
         self._load_files()
         self.cache_path = cache_path
@@ -27,11 +30,12 @@ class ChemdnerCorpus(Corpus):
             with open(pkl_file, 'rb') as f:
                 self.documents[pmid] = cPickle.load(f)
         else:
-            self.documents[pmid]["title"] = self.documents[pmid]["title"].decode("utf-8")
-            self.documents[pmid]["body"] = self.documents[pmid]["body"].decode("utf-8")
+            self.documents[pmid]["title"] = self.documents[pmid]["title"].encode("ascii","ignore")
+            self.documents[pmid]["body"] = self.documents[pmid]["body"].encode("ascii","ignore")
             
             title = [s for s in self.parser.parse(self.documents[pmid]["title"])]
             body = [s for s in self.parser.parse(self.documents[pmid]["body"])]
+            #print type(self.documents[pmid]["title"]), type(self.documents[pmid]["body"])
             
             # initialize annotations   
             self.documents[pmid]["tags"] = []
@@ -104,8 +108,8 @@ class ChemdnerCorpus(Corpus):
         6- Type of chemical entity mention (ABBREVIATION,FAMILY,FORMULA,IDENTIFIERS,MULTIPLE,SYSTEMATIC,TRIVIAL)
         '''
         filelist = [(x,"%s%s.abstracts.txt" % (self.path,x)) for x in self.cv.keys()]
-        for cv,fname in filelist:
-            docs = [d.strip().split("\t") for d in open(fname,"r").readlines()]
+        for cv,fname in filelist: 
+            docs = [d.strip().split("\t") for d in codecs.open(fname,"r",self.encoding).readlines()]
             docs = {pmid:{"title":title,"body":body} for pmid,title,body in docs}
             self.cv[cv] = {pmid:1 for pmid in docs} 
             self.documents.update(docs)
