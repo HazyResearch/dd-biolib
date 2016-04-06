@@ -18,6 +18,8 @@ source .virtualenv/bin/activate
 
 pip install --requirement python-package-requirement.txt
 ```
+To initalize 
+git submodule init --recursive
 
 ## Corpus Tools
 
