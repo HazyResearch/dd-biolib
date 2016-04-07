@@ -110,7 +110,7 @@ class ChemdnerCorpus(Corpus):
             docs = [d.strip().split("\t") for d in codecs.open(fname,"r",self.encoding).readlines()]
             docs = {pmid:{"title":title,"body":body} for pmid,title,body in docs}
             self.cv[cv] = {pmid:1 for pmid in docs} 
-            self.documentsw.update(docs)
+            self.documents.update(docs)
         
         # load annotations
         filelist = [(x,"%s%s.annotations.txt" % (self.path,x)) for x in self.cv.keys()]
