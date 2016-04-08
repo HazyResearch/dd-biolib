@@ -52,8 +52,7 @@ def main(args):
     # Build dictionaries for a given a set of semantic types (i.e., entities)
     dictionary = []
     for sty in args.target:
-        d = meta.dictionary(sty, source_vocab=args.source_vocab)
-        
+        d = meta.dictionary(sty, source_vocab=args.source_vocab, exclude_subtrees=args.exclude_subtrees)
         dictionary += map(norm.normalize,d)
         
     dictionary = {t:1 for t in dictionary}
@@ -72,11 +71,11 @@ def main(args):
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t","--target", type=str, help="target entity list, delimit list by |", default=None)
+    parser.add_argument("-t","--target", type=str, help="Target entity types, delimit list by |", default=None)
     parser.add_argument("-s","--source_vocab", type=str, 
                         help="limit to source vocabularies, delimit list by |", default=None)
-    
-    #parser.add_argument("-n","--ngram", type=int, help="max ngram length (default: any length)", default=None)
+    parser.add_argument("-r","--exclude_subtrees", type=str, 
+                        help="List of subtree root nodes to remove from the target ontology, delimit list by |", default=None)
     parser.add_argument("-e","--embeddings", type=str, help="word embeddings (default: none)", default=None)
     parser.add_argument("-k","--knn", type=int, help="expand dictionary with k nearest neighbors (default: none)", default=None)   
     args = parser.parse_args()
@@ -86,5 +85,6 @@ if __name__ == '__main__':
     else:
         args.target = args.target.split("|")
         args.source_vocab = args.source_vocab.split("|") if args.source_vocab else []
+        args.exclude_subtrees = args.exclude_subtrees.split("|") if args.exclude_subtrees else []
         
         main(args)

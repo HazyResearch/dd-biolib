@@ -161,7 +161,7 @@ class Metathesaurus(object):
     
     
     def dictionary(self, semantic_type, source_vocab=[], cui_dict=False, 
-                   include_children=True,
+                   exclude_subtrees=[],
                    ignore_tty=['OAS','OAP','OAF','OAS','FN','OF','MTH_OF',
                                'MTH_IS','LPN','CSN','PCE','N1','AUN','IS']):
         """Build dictionary of UMLS entities 
@@ -169,11 +169,14 @@ class Metathesaurus(object):
         Parameters
         ----------
         semantic_type: string
-            Target UMLS semantic type
+            Target UMLS semantic type root
         
         source_vocab: array
             Override object source vocabularies (SAB) used for building
             lexical variations dictionary.
+        
+        exclude_subtrees: array
+            List of subtree root nodes to remove from ontology
         
         cui_dict: boolean
             Instead of strings, return dictionary of CUIs
@@ -188,10 +191,12 @@ class Metathesaurus(object):
         """
         # get all children of provided semantic type
         network = self.semantic_network.graph("isa")
-        if include_children:
-            children = [node for node in nx.bfs_tree(network, semantic_type)]
-        else:
-            children = [semantic_type]
+        
+        # exclude subtrees
+        children = [node for node in nx.bfs_tree(network, semantic_type)]
+        if exclude_subtrees:
+            rm = [nx.bfs_tree(network, subtree_root).nodes() for subtree_root in exclude_subtrees]
+            children = [node for node in children if node not in reduce(lambda x,y:x+y,rm)]
         children = " OR ".join(map(lambda x:"STY='%s'" % x, children))
         
         # override object default source vocabulary?
