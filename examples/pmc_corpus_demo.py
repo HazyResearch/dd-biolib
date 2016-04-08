@@ -10,12 +10,11 @@ inputdir = "../datasets/pmc_orthopedics_subset/"
 parser = SentenceParser()
 corpus = PubMedCentralCorpus(inputdir, parser, cache_path="cache/pmc_ortho/")
 
-sentences = [corpus[uid]["sentences"] for uid in corpus.documents.keys()]
+sentences = [corpus[uid]["sentences"] for uid in corpus.documents.keys()[0:1000]]
 sentences = list(itertools.chain.from_iterable(sentences))
 
 # dictionary matcher
-#dictfile = "../datasets/dictionaries/umls/anatomy.txt"
-dictfile = "/Users/fries/Dropbox/deepdive-biomed/dictionaries/umls/semgroups/anatomy.txt"
+dictfile = "../datasets/dictionaries/umls/anatomy.txt"
 anatomy = {line.strip().split("\t")[0]:1 for line in codecs.open(dictfile,"rU","utf-8").readlines()}
 
 # remove stopwords

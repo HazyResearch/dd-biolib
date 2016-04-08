@@ -52,7 +52,8 @@ def main(args):
     # Build dictionaries for a given a set of semantic types (i.e., entities)
     dictionary = []
     for sty in args.target:
-        d = meta.dictionary(sty)
+        d = meta.dictionary(sty, source_vocab=args.source_vocab)
+        
         dictionary += map(norm.normalize,d)
         
     dictionary = {t:1 for t in dictionary}
@@ -63,7 +64,7 @@ def main(args):
         dictionary = {t:1 for t in terms if t not in dictionary and t.lower() not in dictionary}.keys()
     
     # remove terms that are just digits
-    dictionary = [term for term in dictionary if not re.match("^\d+[.]*\d*$",term)]
+    dictionary = [term for term in dictionary if not re.match("^(\d+[.]*\d*)|([;:\.!?\-\+]+)$",term)]
     
     for term in sorted(dictionary,key=lambda x:len(x.split()),reverse=1):
         print(term.encode("utf-8"))
@@ -71,7 +72,10 @@ def main(args):
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t","--target", type=str, help="target(s) entity (REQUIRED) delitted by |", default=None)
+    parser.add_argument("-t","--target", type=str, help="target entity list, delimit list by |", default=None)
+    parser.add_argument("-s","--source_vocab", type=str, 
+                        help="limit to source vocabularies, delimit list by |", default=None)
+    
     #parser.add_argument("-n","--ngram", type=int, help="max ngram length (default: any length)", default=None)
     parser.add_argument("-e","--embeddings", type=str, help="word embeddings (default: none)", default=None)
     parser.add_argument("-k","--knn", type=int, help="expand dictionary with k nearest neighbors (default: none)", default=None)   
@@ -81,4 +85,6 @@ if __name__ == '__main__':
         parser.print_help()
     else:
         args.target = args.target.split("|")
+        args.source_vocab = args.source_vocab.split("|") if args.source_vocab else []
+        
         main(args)

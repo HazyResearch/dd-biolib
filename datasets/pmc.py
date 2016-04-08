@@ -211,10 +211,7 @@ class PubMedCentralCorpus(Corpus):
             document["section-titles"] += [self.tounicode(title)]
             document["section-text"] += [self.tounicode(content)]
         
-        # unicode veriification
-        #for key in document:
-        #    print key, type(document[key])
-        
+
         return document
        
     def _load_files(self):
