@@ -49,13 +49,16 @@ def main(args):
     meta = umls.Metathesaurus()
     norm = umls.MetaNorm(function=lambda x:x.lower())
     
-    # Build dictionaries for a given semantic type (i.e., entity)
-    dictionary = meta.dictionary(args.target)
-    dictionary = map(norm.normalize,dictionary)
+    # Build dictionaries for a given a set of semantic types (i.e., entities)
+    dictionary = []
+    for sty in args.target:
+        d = meta.dictionary(sty)
+        dictionary += map(norm.normalize,d)
+        
+    dictionary = {t:1 for t in dictionary}
 
     # Use expanded 
     if args.embeddings:
-        dictionary = {t:1 for t in dictionary}
         terms = term_expansion(args.embeddings, dictionary, args.knn)
         dictionary = {t:1 for t in terms if t not in dictionary and t.lower() not in dictionary}.keys()
     
@@ -68,7 +71,7 @@ def main(args):
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser()
-    parser.add_argument("-t","--target", type=str, help="target entity (REQUIRED)", default=None)
+    parser.add_argument("-t","--target", type=str, help="target(s) entity (REQUIRED) delitted by |", default=None)
     #parser.add_argument("-n","--ngram", type=int, help="max ngram length (default: any length)", default=None)
     parser.add_argument("-e","--embeddings", type=str, help="word embeddings (default: none)", default=None)
     parser.add_argument("-k","--knn", type=int, help="expand dictionary with k nearest neighbors (default: none)", default=None)   
@@ -77,4 +80,5 @@ if __name__ == '__main__':
     if not args.target:
         parser.print_help()
     else:
+        args.target = args.target.split("|")
         main(args)

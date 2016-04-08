@@ -1,6 +1,7 @@
 import re
 import sys
 import lxml
+import codecs
 import cPickle
 from datasets import *
 from collections import namedtuple
@@ -57,28 +58,30 @@ class PubMedCentralCorpus(Corpus):
         self.documents = {}
         self._load_files()
         self.cache_path = cache_path
+        self.MAX_SENTENCE_LENGTH = 100 # in tokens
         
     def __iter__(self):
         
         for uid in self.documents:
-            yield self.__getitem__(uid)
+            try:
+                yield self.__getitem__(uid)
+            except:
+                print("Error parsing document %s" % uid)
             
     def __getitem__(self, uid):
         
         # load cached version
         pkl_file = "%s/%s.pkl" % (self.cache_path,uid.split("/")[-1]) if self.cache_path else None
         
-        if pkl_file and os.path.exists(pkl_file):
+        if pkl_file and os.path.exists(pkl_file): 
             with open(pkl_file, 'rb') as f:
                 document = cPickle.load(f)
-                
+           
         elif pkl_file:
             document = self._parse_xml(uid)
             self._preprocess(document)
-            
             with open(pkl_file, 'w+') as f:
-                cPickle.dump(document, f)
-                
+                cPickle.dump(document, f)         
         else:
             document = self._parse_xml(uid)
             self._preprocess(document)
@@ -104,19 +107,30 @@ class PubMedCentralCorpus(Corpus):
             except Exception as e:
                 print "CoreNLP parsing exception %s" % section     
         
-        
         document["sentences"] = []
         #if "abstract" in document:
         #    for section in document["abstract"]:
         #        document["sentences"] += section
          
         for section in document["sections"]:
-            document["sentences"] += [s for s in section]
-        
+            # HACK -- don't include really long sentences
+            document["sentences"] += [s for s in section if len(s.words) <= self.MAX_SENTENCE_LENGTH]
+            
+    
+    def tounicode(self,s):
+        '''Clean up string input. This deals with various annoying text encoding problems.
+        '''
+        if not s:
+            return ""
+        s = s.encode("utf-8","ignore").decode("ascii","ignore")
+        s = s.rstrip(' \t\r\n\0').strip('\0')
+        return s
         
     def _parse_xml(self,uid):
-        '''Parse PMC XML format, pull out relevant metadata
+        '''Parse PMC XML format, pull out relevant metadata. 
+        NOTE: lxml + unicode is a major pain.
         '''
+        #
         doc = lxml.etree.parse(uid)
         document = {"section-text":[],"section-titles":[],"metadata":{}}
         
@@ -127,18 +141,19 @@ class PubMedCentralCorpus(Corpus):
         if root:        
             for node in root[0].iter('*'):
                 if len(node) == 0:
-                    document["metadata"][node.tag] = node.text
+                    document["metadata"][node.tag] = self.tounicode(node.text)
+                    
     
         root = doc.xpath("//article/front/article-meta")
         if root:
             article_ids = doc.xpath("//article/front/article-meta/article-id")
             for node in article_ids:
                 tag = node.attrib["pub-id-type"]
-                document["metadata"][tag] = node.text
+                document["metadata"][tag] = self.tounicode(node.text)
             
             article_title = doc.xpath("//article/front/article-meta/title-group/article-title")
             for node in article_title:
-                document["metadata"][node.tag] = node.text
+                document["metadata"][node.tag] = self.tounicode(node.text)
             
             authors = doc.xpath("//article/front/article-meta/contrib-group/contrib")
             document["metadata"]["authors"] = []
@@ -147,7 +162,7 @@ class PubMedCentralCorpus(Corpus):
                     author = []
                     for child in node.iter('*'):
                         if child.tag not in ["email","xref"] and child.text:
-                            author += [child.text]
+                            author += [self.tounicode(child.text)]
                     document["metadata"]["authors"] += [tuple(author)]
         
         #
@@ -155,7 +170,6 @@ class PubMedCentralCorpus(Corpus):
         #
         abstract = doc.xpath("//article/front/article-meta/abstract")
         if abstract:
-            
             for node in abstract:
                 content = []
                 abstract_name = "abstract-text"
@@ -165,9 +179,9 @@ class PubMedCentralCorpus(Corpus):
                 for sec in node.iter('*'):
                     if not sec.text:
                         continue
-                    content += [sec.text]
+                    content += [self.tounicode(sec.text)]
                     
-                document[abstract_name] = " ".join(content)
+                document[abstract_name] = u" ".join(content)
                 
         #
         # Document sections (always use first title as label)
@@ -182,24 +196,27 @@ class PubMedCentralCorpus(Corpus):
                 node_xpath = node_xpath.split("/") 
                 
                 if "title" in node.tag and node.text:
-                    titles += [node.text]
-                    content += [node.text]
+                    titles += [self.tounicode(node.text)]
+                    content += [self.tounicode(node.text)]
                     
                 # ignore tables
                 #elif ("table" not in node_xpath or "caption" in node_xpath) and node.text:
                 #    content += [node.text]
                 
                 elif node.text:
-                    content += [node.text]
+                    content += [self.tounicode(node.text)]
                 
-            content = " ".join( map(lambda x:re.sub("\s{2,}"," ",x), content)) 
+            content = u" ".join( map(lambda x:re.sub("\s{2,}"," ",x), content)) 
             title = titles[0] if len(titles) > 0 else ""
-            document["section-titles"] += [title]
-            document["section-text"] += [content]
+            document["section-titles"] += [self.tounicode(title)]
+            document["section-text"] += [self.tounicode(content)]
+        
+        # unicode veriification
+        #for key in document:
+        #    print key, type(document[key])
         
         return document
        
     def _load_files(self):
-        
         self.documents = {fname:0 for fname in glob.glob("%s/*/*.nxml" % self.path)}
           

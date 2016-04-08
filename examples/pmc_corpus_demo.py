@@ -1,5 +1,6 @@
-from ddlite import *
+import codecs
 import itertools
+from ddlite import *
 from datasets import PubMedCentralCorpus
 
 #
@@ -9,12 +10,18 @@ inputdir = "../datasets/pmc_orthopedics_subset/"
 parser = SentenceParser()
 corpus = PubMedCentralCorpus(inputdir, parser, cache_path="cache/pmc_ortho/")
 
-sentences = [corpus[uid]["sentences"] for uid in corpus.documents.keys()[0:10]]
+sentences = [corpus[uid]["sentences"] for uid in corpus.documents.keys()]
 sentences = list(itertools.chain.from_iterable(sentences))
 
-# matchers
-dictfile = "../datasets/dictionaries/umls/anatomy.txt"
-anatomy = [line.strip().split("\t")[0] for line in open(dictfile,"rU").readlines()]
+# dictionary matcher
+#dictfile = "../datasets/dictionaries/umls/anatomy.txt"
+dictfile = "/Users/fries/Dropbox/deepdive-biomed/dictionaries/umls/semgroups/anatomy.txt"
+anatomy = {line.strip().split("\t")[0]:1 for line in codecs.open(dictfile,"rU","utf-8").readlines()}
+
+# remove stopwords
+dictfile = "../datasets/dictionaries/chemdner/stopwords.txt"
+stopwords = [line.strip().split("\t")[0] for line in open(dictfile).readlines()]
+anatomy = {word:1 for word in anatomy if word not in stopwords}
 matcher = DictionaryMatch('C', anatomy, ignore_case=True)
 
 # dump candidates
