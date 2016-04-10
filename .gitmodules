@@ -1,3 +1,4 @@
-[submodule "treedlib"]
-	path = treedlib
-	url = https://github.com/HazyResearch/treedlib.git
+[submodule "ddlite"]
+	path = ddlite
+	url = https://www.github.com/HazyResearch/ddlite.git
+	branch = master

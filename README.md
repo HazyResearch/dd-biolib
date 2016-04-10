@@ -24,7 +24,9 @@ pip install --requirement python-package-requirement.txt
 
 ### Setup ddlite/treedlib tools
 
-Make certain you've pulled the most current version of ddlite from github. Then copy (or symlink) `ddlite` into `dd-biolib/ddlite` and `ddlite/treedlib/treedlib/` into `dd-biolib/treedlib`.
+```
+git submodule update --init --recursive --remote
+```
 
 ### Corpus Tools
 
