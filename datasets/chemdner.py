@@ -15,13 +15,10 @@ class ChemdnerCorpus(Corpus):
         self.cv = {"training":{},"development":{},"evaluation":{}}
         self.documents = {}
         self.annotations = {}
-        self.encoding = "utf-8"
-        self.verbose = True
         
         self._load_files()
         self.cache_path = cache_path
-        if not os.path.exists(cache_path):
-            pass
+    
      
     def __getitem__(self,pmid):
         """Use PMID as key and load parsed document object"""
