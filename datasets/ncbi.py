@@ -4,6 +4,7 @@ import cPickle
 from datasets import *
 from collections import namedtuple
 from utils import unescape_penn_treebank
+from statsmodels.regression.tests.test_quantile_regression import idx
 
 Annotation = namedtuple('Annotation', ['text_type','start','end','text','mention_type'])
 
@@ -37,6 +38,19 @@ class NcbiDiseaseCorpus(Corpus):
             
             # align gold annotations
             # -----------------------------------------------------------------
+            
+            title = self.documents[pmid]["title"]
+            body = self.documents[pmid]["body"]
+            doc_str = "%s %s" % (title,body)
+            self.documents[pmid]["sentences"] = [s for s in self.parser.parse(doc_str)]
+            
+            self.documents[pmid]["tags"] = []
+            if pmid in self.annotations:
+                self.documents[pmid]["tags"] = self._label(self.annotations[pmid],self.documents[pmid]["sentences"])
+            else:
+                self.documents[pmid]["tags"] += [[] for _ in range(len(self.documents[pmid]["sentences"]))]
+                
+            '''
             title = [s for s in self.parser.parse(self.documents[pmid]["title"])]
             body = [s for s in self.parser.parse(self.documents[pmid]["body"])]
             
@@ -51,10 +65,11 @@ class NcbiDiseaseCorpus(Corpus):
                 self.documents[pmid]["tags"] += self._label(body_labels,body)
             else:
                 self.documents[pmid]["tags"] += [[] for _ in range(len(self.documents[pmid]["sentences"]))]
+            '''
             # -----------------------------------------------------------------
             
-            #with open(pkl_file, 'w+') as f:
-            #    cPickle.dump(self.documents[pmid], f)
+            with open(pkl_file, 'w+') as f:
+                cPickle.dump(self.documents[pmid], f)
         
         '''
         # initialize annotations  
@@ -91,6 +106,7 @@ class NcbiDiseaseCorpus(Corpus):
                 start = sent_offsets[i]  
                 end = sents[start].token_idxs[-1] + 1
                 
+                debug = []
                 # determine span match (assume potentially overlapping spans)
                 if label.start >= start and label.start <= end:
                     
@@ -102,74 +118,33 @@ class NcbiDiseaseCorpus(Corpus):
                             idx = j
                             break
                     
-                    #print label.text
-                    #print " ".join(sents[start].words[idx:])
-                    #print 
-                    #while sents[start].token_idxs[idx] < span[0]:
-                    #   idx = idx + 1
-                    
                     s_start = idx
-                    text = label.text.replace(" ","")
-                    while text:
-                        t = sents[start].words[idx].replace("-LRB-","(").replace("-RRB-",")")
-                        text = text.lstrip(t)
-                        #print t, "|",text
-                        idx += 1
+                    s_end = len(sents[start].words)
+                    for j in range(idx,len(sents[start].words)):
+                        if span[1] > sents[start].token_idxs[j]:
+                            s_end = j + 1
+                        else:
+                            break
+                            
+                    tags[i] += [ (label.text,(s_start,s_end)) ]
                     
-                    tags[i] += [ (label.text,(s_start,idx)) ]
-                    
-                    mention = "".join(sents[start].words[s_start:idx]).replace("-LRB-","(").replace("-RRB-",")")
+                    '''
+                    mention = "".join(sents[start].words[s_start:s_end]).replace("-LRB-","(").replace("-RRB-",")")
                     
                     if label.text.replace(" ","") != mention:
                         print span
+                        print s_start,s_end
                         print tags[i][-1]
                         print zip(sents[start].token_idxs,sents[start].words)
-                        print " ".join(sents[start].words)
-                        print " ".join(sents[start].words[s_start:idx]).replace("-LRB-","(").replace("-RRB-",")")
-                        print label.text
+                        print zip(sents[start].token_idxs,sents[start].words)[s_start:]
+                        #print
+                        #print " ".join(sents[start].words)
                         print
+                        print " ".join(sents[start].words[s_start:s_end]).replace("-LRB-","(").replace("-RRB-",")")
+                        print label.text
+                        print "------------------"
                     '''
-                    idx = -1
-                    s_end = sents[start].token_idxs[-1]
                     
-                    while s_end > span[1]:
-                        idx = idx - 1
-                        s_end = sents[start].token_idxs[idx]
-                    
-                    
-                    s_start = sents[start].token_idxs[idx]
-                    while s_start > span[0]:
-                        idx = idx - 1
-                        s_start = sents[start].token_idxs[idx]  
-                    
-                    ii = sents[start].token_idxs.index(s_start)
-                    jj = max(ii + 1,sents[start].token_idxs.index(s_end))
-                  
-                    # HACK -- some offset issues to resolve
-                    jj = max(jj-ii, ii+len(label.text.split()))
-                    
-                    mention = "".join(sents[start].words[ii:jj])
-                    mention = mention.replace("-LRB-","(").replace("-RRB-",")")
-                        
-                    if label.text.replace(" ","") != mention:
-                        
-                        print "*", span
-                        print label
-                        print start, end
-                        print zip(sents[start].token_idxs,sents[start].words)
-                        print zip(sents[start].token_idxs,sents[start].words)[ii:]
-                        print ii, jj
-                        print "length of label", len(label.text), label.text
-                        print " ".join(sents[start].words)
-                        mention = " ".join(sents[start].words[ii:jj])
-                        mention = mention.replace("-LRB-","(").replace("-RRB-",")")
-                        
-                        print ii, jj, (jj-ii), label.text, "||", mention
-                        print  "----------------------------------------"
-                        
-                    tags[i] += [ (label.text,(ii,jj+1)) ]
-                    '''
-                
         return tags           
 
     def __iter__(self):
@@ -223,6 +198,7 @@ class NcbiDiseaseCorpus(Corpus):
                     if pmid not in self.annotations:
                         self.annotations[pmid] = []
                     
+                    '''
                     if text_type == "A":
                         start -= len(title) + 1
                         end -= len(title) + 1
@@ -230,7 +206,7 @@ class NcbiDiseaseCorpus(Corpus):
                         if text != body[start:end]:
                             print "Fatal Error"
                             print  body[start:end]
-                    
+                    '''
                     self.annotations[pmid] += [Annotation(text_type, start, end, text, mention_type)]
         
               
