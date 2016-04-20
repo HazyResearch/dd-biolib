@@ -1,10 +1,5 @@
 
 
-#relatedness(cui1, cui2, measure="lesk")
-
-#similarity(cui1, cui2, measure="")
-
-
 from __future__ import division
 
 import networkx as nx
@@ -13,6 +8,7 @@ import numpy as np
 #
 # Path Finding Measures
 #
+
 # Most of these are from WordNet-style examinations of semantic similarity
 
 def max_depth(G):
@@ -74,8 +70,6 @@ def wu_palmer_similarity(G, n1, n2):
     """Wu-Palmer Similarity. Scales the depth of the least common subsumer 
     by the length of the shortest path between n1 and n2"""
     pass
-
-
 
 
 #

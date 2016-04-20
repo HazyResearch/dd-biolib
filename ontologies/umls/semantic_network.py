@@ -6,7 +6,7 @@ import mysql.connector
 import operator
 import networkx as nx
 import database
-import umls
+from .umls import config
 
 module_path = os.path.dirname(__file__)
 
@@ -21,8 +21,8 @@ class SemanticNetwork(object):
     def __init__(self,conn=None):
         
         if not conn:
-            self.conn = database.MySqlConn(umls.config.HOST, umls.config.USER, 
-                                       umls.config.DATABASE, umls.config.PASSWORD)
+            self.conn = database.MySqlConn(config.HOST, config.USER, 
+                                       config.DATABASE, config.PASSWORD)
             self.conn.connect()
         else:
             self.conn = conn

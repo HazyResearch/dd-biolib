@@ -1,9 +1,5 @@
-'''
-
-'''
 import networkx as nx
 import matplotlib.pyplot as plt
-
 
 def pprint_tree(T,root,indent=0):
     """Recursive print of tree structure"""
@@ -13,8 +9,7 @@ def pprint_tree(T,root,indent=0):
             pprint_tree(T,child,indent + 1)
         else:
             print(('  ' * indent) + child)
-
-
+            
 def draw(G):
     
     nx.write_dot(G,'/tmp/go.dot')

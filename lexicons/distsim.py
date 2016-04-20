@@ -1,4 +1,10 @@
+#
+#
+# EXPERIMENTAL
+#
+#
 import re
+import string
 from sklearn.neighbors import *
 from collections import defaultdict
 from gensim.models.word2vec import Word2Vec

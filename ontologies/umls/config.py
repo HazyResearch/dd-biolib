@@ -3,11 +3,6 @@ USER = "umls"
 DATABASE = "2014AB"
 PASSWORD = ""
 
-#HOST = "rocky.stanford.edu"
-#USER = "umls_guest"
-#PASSWORD = "publicUMLSsnapshot"
-#DATABASE = "umls"
-
 CACHE_RESULTS = True
 CACHE_DIR = "data/"
 
