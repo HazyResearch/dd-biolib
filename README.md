@@ -22,24 +22,18 @@ source .virtualenv/bin/activate
 pip install --requirement python-package-requirement.txt
 ```
 
-### Setup ddlite/treedlib tools
-
-Make certain you've pulled the most current version of ddlite from github. Then copy (or symlink) `ddlite` into `dd-biolib/ddlite` and `ddlite/treedlib/treedlib/` into `dd-biolib/treedlib`.
-
 ### Corpus Tools
 
 We provide 2 basic corpus object for iterating and parsing document collections: `PubMedAbstractCorpus` for PubMed Abstracts and `PubMedCentralCorpus` for XML documents from the [PMC Open Access Subset](http://www.ncbi.nlm.nih.gov/pmc/tools/ftp/). Please see
-`dd-biolib/examples` for examples of how to use these objects. 
+`ddbiolib/examples` for examples of how to use these objects. 
 
 ## Jupyter Notebooks
 
 ### UMLS Metathesauraus Tools 
+`examples/UmlsMetathesaurus.ipynb`
+
 This notebook provides an overview of how to interact with the UMLS for 
 creating dictionaries or accessing concepts and their synonym sets, navigating
 onotologies, etc. 
 
-### Chemical Name Extraction Demo
-The `ChemicalExtractor.ipynb` notebook looks at a real benchmark data set for tagging chemical named entities
-in biomedical literature. We show a simple walk-through on how to generate candidates
-and write learning functions for `ddlite`.
-
+See the dd-bio-examples repo for some example taggers
