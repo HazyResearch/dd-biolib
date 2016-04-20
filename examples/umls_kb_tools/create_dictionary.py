@@ -1,10 +1,9 @@
 #!/usr/bin/env python
 
 '''
-UMLS Metathesaurus Dictionary Builder
+Simple UMLS Metathesaurus Dictionary Builder
 
 + Build dictionaries of UMLS semantic types
-+ Expand dictionary using
 
 (See umls/docs for list of UMLS Semantic Types)
 '''

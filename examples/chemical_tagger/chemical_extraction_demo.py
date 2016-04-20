@@ -19,9 +19,12 @@ def rule_tokenizer(s):
 # I. Load and Parse Corpus
 #
 # ---------------------------------------------------------------------
+DICT_ROOT = "../../datasets/dictionaries/"
+CORPUS_ROOT = "../../datasets/chemdner_corpus/"
+
 parser = SentenceParser()
-corpus = ChemdnerCorpus('../datasets/chemdner_corpus/', parser=parser, 
-                        cache_path="/users/fries/desktop/cache/")
+corpus = ChemdnerCorpus(CORPUS_ROOT, parser=parser, 
+                        cache_path="/tmp/")
 
 # ChemNDER has pre-defined cross-validation folds
 dev_set = corpus.cv["development"].keys()
@@ -45,11 +48,13 @@ print("%d tokens" % word_n)
 #
 # ---------------------------------------------------------------------
 # dictionaries from tmChem & the UMLS
-dict_fnames = ["../datasets/dictionaries/chemdner/mention_chemical.txt",
-              "../datasets/dictionaries/chemdner/chebi.txt",
-              "../datasets/dictionaries/chemdner/addition.txt",
-              "../datasets/dictionaries/umls/substance-sab-all.txt",
-              "../datasets/dictionaries/chemdner/train.chemdner.vocab.txt"]
+
+dict_fnames = ["%s/chemdner/mention_chemical.txt",
+              "%s/chemdner/chebi.txt",
+              "%s/chemdner/addition.txt",
+              "%s/umls/substance-sab-all.txt",
+              "%s/chemdner/train.chemdner.vocab.txt"]
+dict_fnames = [s % DICT_ROOT for s in dict_fnames]
 
 chemicals = []
 for fname in dict_fnames:

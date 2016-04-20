@@ -33,7 +33,6 @@ c2.print_summary()
 # build CUI-level concept graph using MeSH (Medical Subject Headings)
 cui_graph = meta.concept_graph(level="CUI",source_vocab=["MSH","RXNORM","SNOMEDCT-US"])
 
-
 # Similarity Measures
 print("Simple Path Similarity:", metrics.path_similarity(nx.Graph(cui_graph), c1.cui, c2.cui))
 
