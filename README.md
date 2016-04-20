@@ -2,7 +2,7 @@
 
 This module consists of tools for iterating over biomedical document collections, interacting with biomedical ontologies, creating dictionaries for labeling entity candidates, and writing learning functions for use in distant supervision tasks. 
 
-## Installing dd-biolib
+## Installing ddbiolib
 
 ### Dependencies 
 
