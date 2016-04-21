@@ -4,7 +4,7 @@ import os
 import umls
 import database
 import networkx as nx
-import ddlite
+from ..ddlite import Matcher
 
 module_path = os.path.dirname(__file__)
 
@@ -395,7 +395,7 @@ class Concept(object):
         print("-----------------------------")
         
 
-class UmlsMatch(ddlite.Matcher):
+class UmlsMatch(Matcher):
     '''Directly match strings to UMLS concept strings (rather than a 
     pre-computed dictionary). This is much faster for matching arbitrary
     strings, at the expense of more database queries. 

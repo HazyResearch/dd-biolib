@@ -6,9 +6,9 @@ import numpy as np
 from utils import *
 from sklearn.neighbors import *
 from collections import defaultdict
-from ddlite import Matcher, DictionaryMatch
+from ddlite import CandidateExtractor, DictionaryMatch
 
-class AllUpperNounsMatcher(Matcher):
+class AllUpperNounsMatcher(CandidateExtractor):
     def __init__(self, label):
         self.label = label
         # Regex matcher to find named nouns in part-of-speech tags
