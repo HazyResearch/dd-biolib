@@ -13,6 +13,10 @@ class NcbiDiseaseCorpus(Corpus):
     to serve as a research resource for the biomedical natural language processing 
     community. 
                     -- from http://www.ncbi.nlm.nih.gov/CBBresearch/Dogan/DISEASE/
+                    
+        793 PubMed abstracts
+        6,892 disease mentions
+        790 unique disease concepts
     '''
     def __init__(self, path, parser, cache_path="/tmp/"):
         super(NcbiDiseaseCorpus, self).__init__(path, parser)
@@ -33,8 +37,9 @@ class NcbiDiseaseCorpus(Corpus):
             with open(pkl_file, 'rb') as f:
                 self.documents[pmid] = cPickle.load(f)
         else:
-            self.documents[pmid]["title"] = self.documents[pmid]["title"].encode("ascii","ignore")
-            self.documents[pmid]["body"] = self.documents[pmid]["body"].encode("ascii","ignore")
+            print "PMID",pmid
+            self.documents[pmid]["title"] = self.documents[pmid]["title"]#.encode("ascii","ignore")
+            self.documents[pmid]["body"] = self.documents[pmid]["body"]#.encode("ascii","ignore")
             
             # align gold annotations
             # -----------------------------------------------------------------
@@ -159,6 +164,7 @@ class NcbiDiseaseCorpus(Corpus):
                   "NCBItrainset_corpus.txt":"training"}
         
         filelist = glob.glob("%s/*.txt" % self.path)
+        print filelist
         for fname in filelist:
             setname = cvdefs[fname.split("/")[-1]]
             documents = []
@@ -173,7 +179,7 @@ class NcbiDiseaseCorpus(Corpus):
                         row = row.split("|") if (len(row.split("|")) > 1 and row.split("|")[1] in ["t","a"]) else row.split("\t")
                         doc += [row]
                 documents += [doc]
-            
+      
             for doc in documents:
                 pmid,title,body = doc[0][0],doc[0][2],doc[1][2]
                 self.cv[setname][pmid] = 1
@@ -198,15 +204,7 @@ class NcbiDiseaseCorpus(Corpus):
                     if pmid not in self.annotations:
                         self.annotations[pmid] = []
                     
-                    '''
-                    if text_type == "A":
-                        start -= len(title) + 1
-                        end -= len(title) + 1
-                        
-                        if text != body[start:end]:
-                            print "Fatal Error"
-                            print  body[start:end]
-                    '''
                     self.annotations[pmid] += [Annotation(text_type, start, end, text, mention_type)]
         
-              
+            
+            print [len(self.cv[key]) for key in self.cv]

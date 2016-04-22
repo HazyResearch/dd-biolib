@@ -88,7 +88,9 @@ class ChemdnerCorpus(Corpus):
                         print "label:", label.text, (s_start,s_end)
                         print "text: ", " ".join(sents[start].words[s_start:s_end])
                         
-                    tags[i] += [ (label.text,(s_start,s_end)) ]
+                    #tags[i] += [ (label.text,(s_start,s_end)) ]
+                    tokenized_text = " ".join(sents[start].words[s_start:s_end])
+                    tags[i] += [ (tokenized_text,(s_start,s_end)) ]
     
         return tags
     
