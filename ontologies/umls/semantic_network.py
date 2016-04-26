@@ -6,7 +6,7 @@ import mysql.connector
 import operator
 import networkx as nx
 import database
-from .umls import config
+from ontologies.umls import config
 
 module_path = os.path.dirname(__file__)
 

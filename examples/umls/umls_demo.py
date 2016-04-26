@@ -25,9 +25,9 @@ TODO
 '''
 from __future__ import print_function
 
-import umls
-from umls.graph import pprint_tree
 import sys
+import ontologies.umls as umls
+from ontologies.umls.graph import pprint_tree
 
 meta = umls.Metathesaurus()
 norm = umls.MetaNorm(function=lambda x:x.lower())

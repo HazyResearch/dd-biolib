@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 import sys
-import umls
 import codecs
 import operator
 import itertools
 from ddlite import *
 from datasets import *
-from utils import unescape_penn_treebank
+import ontologies.umls
+from ddlite.ddbiolib.utils import unescape_penn_treebank
 from lexicons import RuleTokenizedDictionaryMatch
 
 def rule_tokenizer(s):

@@ -1,10 +1,11 @@
 import sys
 import re
 import os
-import umls
+import ontologies.umls
+from ontologies.umls import config
 import database
 import networkx as nx
-from ..ddlite import Matcher
+
 
 module_path = os.path.dirname(__file__)
 
@@ -27,11 +28,11 @@ class Metathesaurus(object):
     """
     def __init__(self, source_vocab=[], cache=True):
         
-        self.conn = database.MySqlConn(umls.config.HOST, umls.config.USER, 
-                                       umls.config.DATABASE, umls.config.PASSWORD)
+        self.conn = database.MySqlConn(config.HOST, config.USER, 
+                                       config.DATABASE, config.PASSWORD)
         self.conn.connect()
         self.norm = MetaNorm()
-        self.semantic_network = umls.SemanticNetwork(self.conn)
+        self.semantic_network = ontologies.umls.SemanticNetwork(self.conn)
         
         # source vocabularies (SAB)
         self.source_vocab = source_vocab
@@ -394,91 +395,3 @@ class Concept(object):
         print(fmt.format("TERMS:", ", ".join(self.all_terms()) ))
         print("-----------------------------")
         
-
-class UmlsMatch(Matcher):
-    '''Directly match strings to UMLS concept strings (rather than a 
-    pre-computed dictionary). This is much faster for matching arbitrary
-    strings, at the expense of more database queries. 
-    '''
-    def __init__(self, label, match_attrib='words', 
-                 semantic_types=[], source_vocab=[], 
-                 max_ngr=4, ignore_case=True):
-
-        # connect to UMLS dictionary
-        self.conn = database.MySqlConn(umls.config.HOST, umls.config.USER, 
-                                       umls.config.DATABASE, umls.config.PASSWORD)
-        self.conn.connect()
-        
-        # initialize semantic network to define core entity types
-        self.semantic_network = umls.SemanticNetwork(self.conn)
-        self.taxonomy = self.semantic_network.graph(relation="isa")
-        
-        self.label = label
-        self.match_attrib = match_attrib
-        self.source_vocab = source_vocab
-     
-        self.ignore_case = ignore_case
-        self.ngr = range(0,max_ngr+1)
-        
-        self.sty = [[node for node in nx.bfs_tree(self.taxonomy,sty)] for sty in semantic_types]
-        self.sty = reduce(lambda x,y:x+y,self.sty) if self.sty else []
-        self.sty = " OR ".join(["STY='%s'" % x for x in self.sty])
-        self.sab = " OR ".join(["SAB='%s'" % x for x in self.source_vocab])
-        self.sab = "(%s)" % self.sab if self.sab else ""
-        self.sty = "(%s)" % self.sty if self.sty else ""
-        
-        self._cache = {}
-        
-        # replace CoreNLP/PennTreekBank
-        self.repl = dict([('-LRB-','('), ('-RRB-',')'), ('-LCB-','{'), 
-                                 ('-RCB-','}'), ('-LSB-','['),('-RSB-',']')])
-        
-        # UMLS doesn't use unicode greek letters, so expand to ASCII form
-        greek_letters = [x.strip().split("\t") for x in 
-                         open("%s/data/GreekLetters.txt" % module_path,"rU").readlines()]
-        self.repl.update(dict(greek_letters))
-        
-        
-    def apply(self,s):
-        '''Match all semantic types by default
-        '''
-        sql = """SELECT C.CUI,SAB,STR,STY FROM MRCONSO AS C, MRSTY AS S
-                 WHERE %s STR LIKE '%s' AND C.CUI=S.CUI;"""
-            
-        q = " AND ".join([x for x in [self.sab,self.sty] if x])
-        sql = sql % (q + " AND " if q else "", "%s")
-    
-        # Make sure we're operating on a dict, then get match_attrib
-        try:
-            seq = s[self.match_attrib]
-            
-        except TypeError:
-            seq = s.__dict__[self.match_attrib]
-    
-        # normalize sentence, replacing PennTreeBank tags and Greek letters
-        phrase = " ".join(seq)
-        for token in self.repl:
-            phrase = phrase.replace(token,self.repl[token])
-        seq = phrase.split()
-               
-        # Loop over all ngrams
-        for l in self.ngr:
-            for i in range(0, len(seq)-l+1):
-                phrase = ' '.join(seq[i:i+l]).strip()
-           
-                if not phrase:
-                    continue
-                
-                # Queries are case insensitive by default.
-                # HACK: check matched strings 
-                if phrase in self._cache:
-                    yield list(range(i, i+l)), self.label
-                else:
-                    # escape sql string
-                    esc_phrase = re.sub("(['\"%])",r"\\\1",phrase)
-                    q = sql % (esc_phrase)
-                    results = self.conn.query(q)
-                    
-                    if (results and self.ignore_case) or phrase in [x[2] for x in results]:
-                        self._cache[phrase] = 1
-                        yield list(range(i, i+l)), self.label

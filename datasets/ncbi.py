@@ -37,64 +37,37 @@ class NcbiDiseaseCorpus(Corpus):
             with open(pkl_file, 'rb') as f:
                 self.documents[pmid] = cPickle.load(f)
         else:
-            print "PMID",pmid
-            self.documents[pmid]["title"] = self.documents[pmid]["title"]#.encode("ascii","ignore")
-            self.documents[pmid]["body"] = self.documents[pmid]["body"]#.encode("ascii","ignore")
+            
+            self.documents[pmid]["title"] = self.documents[pmid]["title"]
+            self.documents[pmid]["body"] = self.documents[pmid]["body"]
             
             # align gold annotations
             # -----------------------------------------------------------------
-            
             title = self.documents[pmid]["title"]
             body = self.documents[pmid]["body"]
             doc_str = "%s %s" % (title,body)
-            self.documents[pmid]["sentences"] = [s for s in self.parser.parse(doc_str)]
+            self.documents[pmid]["sentences"] = [s for s in self.parser.parse(doc_str,doc_id=pmid)]
             
             self.documents[pmid]["tags"] = []
             if pmid in self.annotations:
                 self.documents[pmid]["tags"] = self._label(self.annotations[pmid],self.documents[pmid]["sentences"])
             else:
-                self.documents[pmid]["tags"] += [[] for _ in range(len(self.documents[pmid]["sentences"]))]
-                
-            '''
-            title = [s for s in self.parser.parse(self.documents[pmid]["title"])]
-            body = [s for s in self.parser.parse(self.documents[pmid]["body"])]
-            
-            # initialize annotations   
-            self.documents[pmid]["tags"] = []
-            self.documents[pmid]["sentences"] = title + body
-            
-            if pmid in self.annotations:
-                title_labels = [label for label in self.annotations[pmid] if label.text_type=='T']
-                body_labels = [label for label in self.annotations[pmid] if label.text_type=='A']
-                self.documents[pmid]["tags"] = self._label(title_labels,title)
-                self.documents[pmid]["tags"] += self._label(body_labels,body)
-            else:
-                self.documents[pmid]["tags"] += [[] for _ in range(len(self.documents[pmid]["sentences"]))]
-            '''
+                self.documents[pmid]["tags"] += [[] for _ in range(len(self.documents[pmid]["sentences"]))]   
             # -----------------------------------------------------------------
             
             with open(pkl_file, 'w+') as f:
                 cPickle.dump(self.documents[pmid], f)
         
-        '''
-        # initialize annotations  
-        title = [s for s in self.parser.parse(self.documents[pmid]["title"])]
-        body = [s for s in self.parser.parse(self.documents[pmid]["body"])]
-        
-        self.documents[pmid]["tags"] = []
-        self.documents[pmid]["sentences"] = title + body
-        
-        if pmid in self.annotations:
-            title_labels = [label for label in self.annotations[pmid] if label.text_type=='T']
-            body_labels = [label for label in self.annotations[pmid] if label.text_type=='A']
-            self.documents[pmid]["tags"] = self._label(title_labels,title)
-            self.documents[pmid]["tags"] += self._label(body_labels,body)
-        else:
-            self.documents[pmid]["tags"] += [[] for _ in range(len(self.documents[pmid]["sentences"]))]
-        '''
-        
         return self.documents[pmid]
-           
+    
+    def score(self,candidates,holdout=None):
+        '''Given a set of candidates, compute true precision, recall, f1
+        using gold labeled benchmark data (this includes non-candidate entities,
+        which aren't captured by ddlite metrics). If holdout (a list of 
+        document PMIDs) is provided, us that as the document collection for scoring.
+        '''
+        pass
+       
     def _label(self,annotations,sentences):
         '''Convert annotations from NCBI offsets to parsed token offsets. 
         NOTE: This isn't perfect, since tokenization can fail to correctly split
@@ -164,7 +137,7 @@ class NcbiDiseaseCorpus(Corpus):
                   "NCBItrainset_corpus.txt":"training"}
         
         filelist = glob.glob("%s/*.txt" % self.path)
-        print filelist
+
         for fname in filelist:
             setname = cvdefs[fname.split("/")[-1]]
             documents = []
@@ -206,5 +179,3 @@ class NcbiDiseaseCorpus(Corpus):
                     
                     self.annotations[pmid] += [Annotation(text_type, start, end, text, mention_type)]
         
-            
-            print [len(self.cv[key]) for key in self.cv]

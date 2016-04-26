@@ -10,7 +10,7 @@ Simple UMLS Metathesaurus Dictionary Builder
 from __future__ import print_function
 
 import re
-import umls
+import ontologies.umls as umls
 import argparse
 from sklearn.neighbors import *
 from gensim.models.word2vec import Word2Vec
@@ -55,7 +55,8 @@ def main(args):
         dictionary += map(norm.normalize,d)
         
     dictionary = {t:1 for t in dictionary}
-
+    
+    print(len(dictionary))
     # Use expanded 
     if args.embeddings:
         terms = term_expansion(args.embeddings, dictionary, args.knn)
