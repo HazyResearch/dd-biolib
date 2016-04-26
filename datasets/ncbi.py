@@ -1,9 +1,9 @@
 import sys
 import codecs
 import cPickle
-from datasets import *
 from collections import namedtuple
-from utils import unescape_penn_treebank
+from ddlite.ddbiolib.datasets import *
+from ddlite.ddbiolib.utils import unescape_penn_treebank
 from statsmodels.regression.tests.test_quantile_regression import idx
 
 Annotation = namedtuple('Annotation', ['text_type','start','end','text','mention_type'])

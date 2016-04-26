@@ -1,9 +1,10 @@
 import re
+import os
 import sys
 import lxml
 import codecs
 import cPickle
-from datasets import *
+from ddlite.ddbiolib.datasets import *
 from collections import namedtuple
 
 class PubMedAbstractCorpus(Corpus):
@@ -31,6 +32,7 @@ class PubMedAbstractCorpus(Corpus):
         if os.path.exists(pkl_file):
             with open(pkl_file, 'rb') as f:
                 self.documents[pmid] = cPickle.load(f)
+                print type(self.documents[pmid])
         else:
             title = [s for s in self.parser.parse(self.documents[pmid]["title"].decode("utf-8"))]
             body = [s for s in self.parser.parse(self.documents[pmid]["body"].decode("utf-8"))]
@@ -74,6 +76,7 @@ class PubMedCentralCorpus(Corpus):
         pkl_file = "%s/%s.pkl" % (self.cache_path,uid.split("/")[-1]) if self.cache_path else None
         
         if pkl_file and os.path.exists(pkl_file): 
+            #print pkl_file
             with open(pkl_file, 'rb') as f:
                 document = cPickle.load(f)
            
@@ -81,7 +84,11 @@ class PubMedCentralCorpus(Corpus):
             document = self._parse_xml(uid)
             self._preprocess(document)
             with open(pkl_file, 'w+') as f:
-                cPickle.dump(document, f)         
+                cPickle.dump(document, f)   
+         
+            #for key in document:
+            #    print key, document[key]  
+                 
         else:
             document = self._parse_xml(uid)
             self._preprocess(document)

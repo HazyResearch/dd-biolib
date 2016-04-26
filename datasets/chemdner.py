@@ -1,10 +1,9 @@
 import os
-import sys
 import codecs
 import cPickle
 from collections import namedtuple
-from .base import *
-from utils import unescape_penn_treebank
+from ddlite.ddbiolib.datasets import *
+from ddlite.ddbiolib.utils import unescape_penn_treebank
 
 Annotation = namedtuple('Annotation', ['text_type','start','end','text','mention_type'])
 
