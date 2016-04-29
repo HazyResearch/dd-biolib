@@ -2,6 +2,13 @@ import os
 import glob
 import cPickle
 import codecs
+from collections import namedtuple
+
+Annotation = namedtuple('Annotation', ['text_type','start','end','text','mention_type'])
+# duplicate sentence oject definition is used to fix pickle issues related to ddlite path
+Sentence = namedtuple('Sentence', ['words', 'lemmas', 'poses', 'dep_parents',
+                                   'dep_labels', 'sent_id', 'doc_id', 'text',
+                                   'token_idxs'])
 
 class Corpus(object):
     
@@ -38,7 +45,6 @@ class PlainTextCorpus(Corpus):
     def __getitem__(self, uid):
         
         pkl_file = "%s/%s.pkl" % (self.cache_path, uid)
-        
         # load cached parse if it exists  
         if os.path.exists(pkl_file):
             with open(pkl_file, 'rb') as f:
@@ -58,4 +64,3 @@ class PlainTextCorpus(Corpus):
             uid = fname.split("/").rstrip(".txt")
             self.documents[uid] = {}
             self.documents[uid]["text"] = "".join(codecs.open(self.path,"r").readlines())
-        

@@ -1,21 +1,24 @@
 import bz2
+import sys
+import numpy as np
 import itertools
-from ddlite import *
+from ddlite import SentenceParser,DictionaryMatch,Entities
 from utils import unescape_penn_treebank
 from datasets import NcbiDiseaseCorpus
 
+ROOT = "../../../"
 INDIR = "/Users/fries/Desktop/dnorm/"
 OUTDIR = "/users/fries/desktop/dnorm/"
 
 def load_disease_dictionary():    
-    dictfile = "datasets/dictionaries/chemdner/stopwords.txt"
+    dictfile = "{}/datasets/dictionaries/chemdner/stopwords.txt".format(ROOT)
     stopwords = [line.strip().split("\t")[0] for line in open(dictfile).readlines()]
     
-    dictfile = "datasets/dictionaries/umls/umls_disease_syndrome.bz2"
+    dictfile = "{}/datasets/dictionaries/umls/umls_disease_syndrome.bz2".format(ROOT)
     diseases = {line.strip().split("\t")[0]:1 for line in bz2.BZ2File(dictfile, 'rb').readlines()}
     diseases = {word:1 for word in diseases if word not in stopwords}
     
-    dictfile = "datasets/dictionaries/ncbi/ncbi_training_diseases.txt"
+    dictfile = "{}/datasets/dictionaries/ncbi/ncbi_training_diseases.txt".format(ROOT)
     terms = [line.strip().split("\t")[0] for line in open(dictfile).readlines()]
     diseases.update({word:1 for word in terms if word not in stopwords})
     
@@ -27,6 +30,8 @@ def create_corpus_dict(corpus, setdef="training"):
     
     dev_set = list(itertools.chain.from_iterable([corpus.cv[setdef].keys() for setdef in [setdef]]))
     documents = [(doc_id,corpus[doc_id]["sentences"],corpus[doc_id]["tags"]) for doc_id in dev_set]
+    
+    print len(dev_set),len(corpus.documents)
     
     d = {}
     for pmid,doc,labels in documents:
@@ -47,7 +52,7 @@ def create_corpus_dict(corpus, setdef="training"):
 # Corpus
 #
 
-cache = "{}/cache/".format(INDIR)
+cache = "{}/cache3/".format(INDIR)
 infile = "{}/disease_names/".format(INDIR)
 holdouts = ["training","development","testing"]
 
@@ -63,6 +68,12 @@ word_n = sum([len(sent.words) for sent in list(itertools.chain.from_iterable(doc
 print("%d PubMed abstracts" % len(documents))
 print("%d Disease gold entities" % gold_entity_n)
 print("%d tokens" % word_n)
+
+# training set dictionary
+td = create_corpus_dict(corpus,"training")
+create_corpus_dict(corpus,"development")
+create_corpus_dict(corpus,"testing")
+print len(td)
 
 #
 # Match Candidates
@@ -128,4 +139,8 @@ np.save("{}/ncbi-candidates-gold.npy".format(OUTDIR),candidate_gold_labels)
 sentences = list(itertools.chain.from_iterable(documents))
 candidates = Entities(sentences, matcher)
 candidates.dump_candidates("{}/all-ncbi-candidates.pkl".format(OUTDIR))
+
+
+pred = [1] * len(candidates)
+corpus.score(candidates,pred,corpus.cv["development"].keys())
 

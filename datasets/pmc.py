@@ -4,8 +4,9 @@ import sys
 import lxml
 import codecs
 import cPickle
-from ddlite.ddbiolib.datasets import *
 from collections import namedtuple
+#from ddlite.ddbiolib.datasets import *
+from . import *
 
 class PubMedAbstractCorpus(Corpus):
     

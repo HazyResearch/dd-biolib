@@ -2,8 +2,10 @@ import os
 import codecs
 import cPickle
 from collections import namedtuple
-from ddlite.ddbiolib.datasets import *
-from ddlite.ddbiolib.utils import unescape_penn_treebank
+print 
+from . import *
+#from .utils import unescape_penn_treebank
+#ddbiolib.datasets
 
 Annotation = namedtuple('Annotation', ['text_type','start','end','text','mention_type'])
 
@@ -74,7 +76,6 @@ class ChemdnerCorpus(Corpus):
                     s_start = idx
                     s_end = len(sents[start].words)
                     for j in range(idx,len(sents[start].words)):
-                        #print sents[start].token_idxs[s_start:j], span
                         if span[1] > sents[start].token_idxs[j]:
                             s_end = j + 1
                         else:
