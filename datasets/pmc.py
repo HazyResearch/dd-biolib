@@ -32,10 +32,11 @@ class PubMedAbstractCorpus(Corpus):
         if os.path.exists(pkl_file):
             with open(pkl_file, 'rb') as f:
                 self.documents[pmid] = cPickle.load(f)
-                print type(self.documents[pmid])
+               
         else:
-            title = [s for s in self.parser.parse(self.documents[pmid]["title"].decode("utf-8"))]
-            body = [s for s in self.parser.parse(self.documents[pmid]["body"].decode("utf-8"))]
+            
+            title = [s for s in self.parser.parse(self.documents[pmid]["title"])]
+            body = [s for s in self.parser.parse(self.documents[pmid]["body"])]
             self.documents[pmid]["sentences"] = title + body
             with open(pkl_file, 'w+') as f:
                 cPickle.dump(self.documents[pmid], f)
@@ -44,7 +45,7 @@ class PubMedAbstractCorpus(Corpus):
         
     def _load_files(self):
         
-        docs = [d.strip().split("\t") for d in open(self.path,"r").readlines()]
+        docs = [d.strip().split("\t") for d in codecs.open(self.path,"r").readlines()]
         docs = {pmid:{"title":title,"body":body,"pmid":pmid} for pmid,title,body in docs}
         self.documents.update(docs)
         

@@ -1,42 +1,46 @@
-import os
-import sys
 import codecs
 import itertools
-from ddlite import SentenceParser,DictionaryMatch,Entities
+from ddlite import *
 from ddbiolib.datasets import PubMedCentralCorpus
 
 #
 # PubMedCentral Corpus
 #
-inputdir = "/Users/fries/Dropbox/deepdive-biomed/corpora/raw/pmc_orthopedics_subset/"
-
+inputdir = "/Users/fries/Desktop/articles.I-N/"
 parser = SentenceParser()
-corpus = PubMedCentralCorpus(inputdir, parser, cache_path="/Users/fries/desktop/cache_debug/")
+corpus = PubMedCentralCorpus(inputdir, parser, cache_path="/Users/fries/Desktop/pmc_cache/")
 
-sentences = [corpus[uid]["sentences"] for uid in corpus.documents.keys()] #[0:1000]
-sentences = list(itertools.chain.from_iterable(sentences))
+for uid in corpus.documents.keys():
+    sentences = corpus[uid]["sentences"]
+    print "parsed {}".format(uid)
 
 sys.exit()
+sentences = [corpus[uid]["sentences"] for uid in corpus.documents.keys()] #[0:5000]
+sentences = list(itertools.chain.from_iterable(sentences))
+print "DONE"
+sys.exit()
+print len(sentences)
+
 # dictionary matcher
-dictfile = "/Users/fries/Code/fma_anatomy.txt"
+#dictfile = "../datasets/dictionaries/umls/anatomy.txt"
+dictfile = "/Users/fries/Desktop/disease_or_syndrome.txt"
 anatomy = {line.strip().split("\t")[0]:1 for line in codecs.open(dictfile,"rU","utf-8").readlines()}
 
 # remove stopwords
 dictfile = "../datasets/dictionaries/chemdner/stopwords.txt"
 stopwords = [line.strip().split("\t")[0] for line in open(dictfile).readlines()]
 anatomy = {word:1 for word in anatomy if word not in stopwords}
-
-matcher = DictionaryMatch(label='A', dictionary=anatomy, ignore_case=True)
+matcher = DictionaryMatch('C', anatomy, ignore_case=True)
 
 # dump candidates
 candidates = Entities(sentences, matcher)
-candidates.dump_candidates("/users/fries/desktop/anatomy-pmc-ortho-candidates.pkl")
+candidates.dump_candidates("cache/pmc-disease-candidates.pkl")
 
 print "Found %d candidates" % len(candidates)
 for i in range(100):
     print candidates[i]
 
-sys.exit()
+
 #
 # If you need specifc parts of the PMC XML document, use these iteration patterns
 #

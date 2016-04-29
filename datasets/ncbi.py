@@ -59,13 +59,65 @@ class NcbiDiseaseCorpus(Corpus):
         
         return self.documents[pmid]
     
-    def score(self,candidates,holdout=None):
-        '''Given a set of candidates, compute true precision, recall, f1
+    def _ground_truth(self,doc_ids):
+        '''Build '''
+        documents = [(doc_id, self.__getitem__(doc_id)["sentences"], 
+                      self.__getitem__(doc_id)["tags"]) for doc_id in doc_ids]     
+          
+        ground_truth = []
+        for pmid,doc,labels in documents:
+            for sent_id in range(0,len(doc)):
+                for tag in labels[sent_id]:
+                    span = tag[-1]
+                    text = doc[sent_id].words[tag[-1][0]:tag[-1][1]]
+                    text = " ".join(text)
+                    ground_truth += [(pmid, sent_id, tuple(range(*span)), text)]
+        
+        return ground_truth
+    
+    def score(self, candidates, prediction, doc_ids=None):
+        '''TODO -- really code this, not a hack. 
+        Given a set of candidates, compute true precision, recall, f1
         using gold labeled benchmark data (this includes non-candidate entities,
         which aren't captured by ddlite metrics). If holdout (a list of 
         document PMIDs) is provided, us that as the document collection for scoring.
         '''
-        pass
+        # create doc set from candidate pool OR a provided doc_id set
+        doc_ids = {c.doc_id:1 for c in candidates} if not doc_ids else dict.fromkeys(doc_ids)
+        documents = [(doc_id, self.__getitem__(doc_id)["sentences"], 
+                      self.__getitem__(doc_id)["tags"]) for doc_id in doc_ids]     
+          
+        ground_truth = []
+        for pmid,doc,labels in documents:
+            for i in range(0,len(doc)):
+                for tag in labels[i]:
+                    span = tag[-1]
+                    mention = doc[i].words[tag[-1][0]:tag[-1][1]]
+                    ground_truth += [(pmid,i,tuple(range(*span))," ".join(mention))]
+                    
+        ground_truth = dict.fromkeys(ground_truth)
+        mentions = [(c.doc_id,c.sent_id, tuple(c.idxs),
+                     " ".join([c.words[i] for i in c.idxs])) for c in candidates]
+        gold = [1 if c in ground_truth else -1 for c in mentions]
+        
+        # filter doc_ids to target holdout set
+        if holdout:
+            tmp = zip([c.doc_id for c in candidates], gold, prediction, mentions)
+            tmp = [x for x in tmp if x[0] in doc_ids]
+            pmids,gold,prediction,mentions = zip(*tmp)
+        
+        tp = [int(a==1 and b==1) for a,b in zip(gold,prediction)].count(1)
+        fp = [int(a!=1 and b==1) for a,b in zip(gold,prediction)].count(1)
+        fn = len(ground_truth) - tp
+        
+        r = tp / float(len(ground_truth))
+        p = tp / float(tp + fp)
+        f1 = 2.0 * (p * r) / (p + r)
+
+        print tp, fn, fp, len(mentions)
+        return {"precision":p, "recall":r,"f1":f1}
+    
+    
        
     def _label(self,annotations,sentences):
         '''Convert annotations from NCBI offsets to parsed token offsets. 
