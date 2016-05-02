@@ -2,10 +2,34 @@ import os
 import sys
 import codecs
 import cPickle
+import itertools
 #from ddlite.ddbiolib.datasets import *
 #from ddlite.ddbiolib.utils import unescape_penn_treebank
-from . import *
+from .base import *
+from .tools import unescape_penn_treebank
 
+import operator
+from cgitb import text
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+def highlight_span(text, char_span, window=10):
+    
+    #print char_span
+    pre = text[char_span[0]-window:char_span[0]]
+    span = text[char_span[0]:char_span[1]]
+    post = text[char_span[1]:char_span[1]+window]
+    s = "{}{}{}{}{}{}\n".format(pre,bcolors.BOLD, bcolors.WARNING,span,bcolors.ENDC,post)
+    return s
+           
 
 class NcbiDiseaseCorpus(Corpus):
     '''The NCBI disease corpus is fully annotated at the mention and concept level 
@@ -53,18 +77,13 @@ class NcbiDiseaseCorpus(Corpus):
             else:
                 self.documents[pmid]["tags"] += [[] for _ in range(len(self.documents[pmid]["sentences"]))]   
                 
-            # HACK - fix pickle object module errors?
-            #for i in range(len(self.documents[pmid]["sentences"])):
-            #    s = self.documents[pmid]["sentences"][i]
-            #    self.documents[pmid]["sentences"][i] = Sentence(*s.__dict__.items()) 
-                
             with open(pkl_file, 'w+') as f:
                 cPickle.dump(self.documents[pmid], f)
         
         return self.documents[pmid]
     
     def _ground_truth(self,doc_ids):
-        '''Build '''
+        '''Build ground truth (doc_id,sent_id,char_offset) mentions'''
         documents = [(doc_id, self.__getitem__(doc_id)["sentences"], 
                       self.__getitem__(doc_id)["tags"]) for doc_id in doc_ids]     
           
@@ -72,71 +91,145 @@ class NcbiDiseaseCorpus(Corpus):
         for pmid,doc,labels in documents:
             for sent_id in range(0,len(doc)):
                 for tag in labels[sent_id]:
-                      
+                
                     # assess ground truth on token
-                    mention = tag[0]
+                    label = tag[0] # gold standard annotation text
                     span = tag[-1]
                     char_idx = doc[sent_id].token_idxs[span[0]]
-                    char_span = tuple([char_idx, char_idx+len(mention)])
+                    char_span = tuple([char_idx, char_idx+len(label)])
                     
-                    # Tokenization doesn't always match ground truth 
-                    # so match ground truth on char offset match rather than
-                    # text match
-                    text = doc[sent_id].words[tag[-1][0]:tag[-1][1]]
-                    text = " ".join(text)
+                    # normalize for tokenization differences by removing whitespace
+                    #text = doc[sent_id].words[tag[-1][0]:tag[-1][1]]
+                    #text = unescape_penn_treebank(text)
                     
-                    ground_truth += [(pmid, sent_id, tuple(range(*span)), char_span)] #text
+                    # match doc,sentence,char span and text (without tokenization)
+                    ground_truth += [(pmid, sent_id, tuple(range(*span)), char_span, label.replace(" ",""))] 
+                    
         
         return ground_truth
     
     def score(self, candidates, prediction, doc_ids=None):
-        '''TODO -- really code this, not a hack. 
-        Given a set of candidates, compute true precision, recall, f1
+        '''Given a set of candidates, compute true precision, recall, f1
         using gold labeled benchmark data (this includes non-candidate entities,
         which aren't captured by ddlite metrics). If holdout (a list of 
         document PMIDs) is provided, us that as the document collection for scoring.
         '''
         # create doc set from candidate pool OR a provided doc_id set
         doc_ids = {c.doc_id:1 for c in candidates} if not doc_ids else dict.fromkeys(doc_ids)
-        
+        # compute original document character offsets for each mention
         mentions = []
         for c in candidates:
             if c.doc_id not in doc_ids:
                 continue
-            text = " ".join([c.words[i] for i in c.idxs])
-            # compute original document character offset
+            text = "".join([c.words[i] for i in c.idxs])
             char_span = [c.token_idxs[i] for i in c.idxs]
-            char_span = (char_span[0],char_span[-1] + len(c.words[c.idxs[-1]]))
-            mentions += [(c.doc_id, c.sent_id, tuple(c.idxs), char_span)]
+            char_span = (char_span[0], char_span[-1] + len(c.words[c.idxs[-1]]))
+            mentions += [(c.doc_id, c.sent_id, tuple(c.idxs), char_span, text)]
         
         mentions = set(mentions) 
         true_labels = set(self._ground_truth(doc_ids))
         
         tp = true_labels.intersection(mentions)
         fp = mentions.difference(tp)
-        fn = true_labels.difference(fp)
-    
+        fn = true_labels.difference(tp)
+        
         print len(true_labels)
         print len(mentions)
         print len(tp),"tp"
         print len(fp),"fp"
         print len(fn),"fn"
-        
-      
-        '''
-        tp = [int(a==1 and b==1) for a,b in zip(gold,prediction)].count(1)
-        fp = [int(a!=1 and b==1) for a,b in zip(gold,prediction)].count(1)
-        fn = len(ground_truth) - tp
-        
-        r = tp / float(len(ground_truth))
-        p = tp / float(tp + fp)
+           
+        r = len(tp) / float(len(true_labels))
+        p = len(tp) / float(len(tp) + len(fp))
         f1 = 2.0 * (p * r) / (p + r)
 
-        print tp, fn, fp, len(mentions)
         return {"precision":p, "recall":r,"f1":f1}
-        '''
     
-       
+    def error_analysis(self,candidates, prediction, doc_ids=None):
+        ''' Specific types of errors
+        1: subsequence candidate: "hereditary breast cancers" vs. "breast cancers"
+        2: tokenization error / subcharacter sequence 
+        '''
+        doc_ids = {c.doc_id:1 for c in candidates} if not doc_ids else dict.fromkeys(doc_ids)
+        
+        # ground truth annotation index
+        label_idx = {}
+        for doc_id in self.annotations:
+            label_idx[doc_id] = {}
+            for label in self.annotations[doc_id]:
+                label_idx[doc_id][(label.start,label.end)] = (label.text, label.mention_type)
+        
+        # mention offsets
+        mentions = []
+        for c in candidates:
+            if c.doc_id not in doc_ids:
+                continue
+            text = "".join([c.words[i] for i in c.idxs])
+            char_span = [c.token_idxs[i] for i in c.idxs]
+            char_span = (char_span[0],char_span[-1] + len(c.words[c.idxs[-1]]))
+            mentions += [(c.doc_id, c.sent_id, tuple(c.idxs), char_span, text)]
+        
+        mentions = set(mentions) 
+        true_labels = set(self._ground_truth(doc_ids))
+        
+        tp = true_labels.intersection(mentions)
+        fp = mentions.difference(tp)
+        fn = true_labels.difference(tp)
+        
+        print "tp:{} fp:{} fn:{}".format(len(tp),len(fp),len(fn))
+        
+        # False Negatives
+        errors = {"tokenization":0,"oov":0,"subsequence":0}
+        for item in fn:    
+            pmid,sent_id,idxs,char_span,txt = item    
+            text = "{} {}".format(self.documents[pmid]["title"],self.documents[pmid]["body"])
+            tokenized = self.documents[pmid]["sentences"][sent_id].words[min(idxs):max(idxs)+1]
+            tokenized = unescape_penn_treebank(tokenized)
+            true_mention = text[char_span[0]:char_span[1]]
+            
+            if true_mention.replace(" ","") != "".join(tokenized):
+                errors["tokenization"] += 1
+            
+
+        # False Positives
+        overlap = {}
+        for item in fp:
+            pmid,sent_id,idxs,char_span,txt = item
+            text = "{} {}".format(self.documents[pmid]["title"],self.documents[pmid]["body"])
+            # does the provided character span overlap
+            i,j = char_span
+            for cspan in label_idx[pmid]:
+                if i >= cspan[0] and i <= cspan[1]:
+                    m = text[char_span[0]:char_span[1]]
+                    errors["subsequence"] += 1
+                    key = (pmid,cspan)
+                    overlap[key] = overlap.get(key,0) + 1
+        print len(overlap)
+        print errors
+        return 
+    
+        '''
+        # aggregate errors by category
+        # ------------------------------------------
+        mention_type_freq = {"fn":{}}
+        for item in fn:
+            doc_id,_,_,char_span = item
+            text,mention_type = label_idx[doc_id][char_span] 
+            mention_type_freq["fn"][mention_type] = mention_type_freq["fn"].get(mention_type,0) + 1
+            
+        mention_type_freq["tp"] = {}
+        for item in tp:
+            doc_id,_,_,char_span = item
+            text,mention_type = label_idx[doc_id][char_span] 
+            mention_type_freq["tp"][mention_type] = mention_type_freq["tp"].get(mention_type,0) + 1
+        
+        for category in mention_type_freq:
+            print category, mention_type_freq[category]
+        # ------------------------------------------
+        '''
+             
+    
+    
     def _label(self,annotations,sentences):
         '''Convert annotations from NCBI offsets to parsed token offsets. 
         NOTE: This isn't perfect, since tokenization can fail to correctly split
@@ -208,6 +301,10 @@ class NcbiDiseaseCorpus(Corpus):
       
             for doc in documents:
                 pmid,title,body = doc[0][0],doc[0][2],doc[1][2]
+                
+                if pmid in self.documents:
+                    print "Warning: duplicate {} PMID {}".format(setname,pmid)
+                    
                 self.cv[setname][pmid] = 1
                 self.documents[pmid] = {"title":title,"body":body}
                 doc_str = "%s %s" % (title, body)
@@ -230,5 +327,17 @@ class NcbiDiseaseCorpus(Corpus):
                     if pmid not in self.annotations:
                         self.annotations[pmid] = []
                     
-                    self.annotations[pmid] += [Annotation(text_type, start, end, text, mention_type)]
+                    label = Annotation(text_type, start, end, text, mention_type)
+                    self.annotations[pmid] += [label]
+            
+            # validate there are no duplicate annotations
+            labels = [ map(lambda x:(pmid,x), self.annotations[pmid]) for pmid in self.cv[setname]]
+            labels = list(itertools.chain.from_iterable(labels))
+            if len(labels) != len(set(labels)):
+                print "Warning: duplicate annotations found"
+                freq = {l:labels.count(l) for l in labels}
+                freq = {l:n for l,n in freq.items() if n != 1}
+                
+            print setname,len(labels)
         
+            

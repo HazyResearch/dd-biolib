@@ -5,8 +5,8 @@ import lxml
 import codecs
 import cPickle
 from collections import namedtuple
-#from ddlite.ddbiolib.datasets import *
-from . import *
+from .base import *
+from .tools import unescape_penn_treebank
 
 class PubMedAbstractCorpus(Corpus):
     
@@ -32,13 +32,14 @@ class PubMedAbstractCorpus(Corpus):
         # load cached parse if it exists  
         if os.path.exists(pkl_file):
             with open(pkl_file, 'rb') as f:
-                self.documents[pmid] = cPickle.load(f)
-               
+                self.documents[pmid] = cPickle.load(f)        
         else:
+            doc_str = "{} {}".format(self.documents[pmid]["title"],self.documents[pmid]["body"])
+            #title = [s for s in self.parser.parse(self.documents[pmid]["title"],doc_id=pmid)]
+            #body = [s for s in self.parser.parse(self.documents[pmid]["body"],doc_id=pmid)]
+            sentences = [s for s in self.parser.parse(doc_str,doc_id=pmid)]
+            self.documents[pmid]["sentences"] = sentences
             
-            title = [s for s in self.parser.parse(self.documents[pmid]["title"])]
-            body = [s for s in self.parser.parse(self.documents[pmid]["body"])]
-            self.documents[pmid]["sentences"] = title + body
             with open(pkl_file, 'w+') as f:
                 cPickle.dump(self.documents[pmid], f)
                
@@ -98,29 +99,33 @@ class PubMedCentralCorpus(Corpus):
         return document    
         
     def _preprocess(self,document):  
-        
+        '''Parse documents'''
+        # determine unique doc ID
+        if "pmid" in document["metadata"]:
+            doc_id = "PMID:{}".format(document["metadata"]["pmid"])
+        elif "pmc" in document["metadata"]:
+            doc_id = "PMC:{}".format(document["metadata"]["pmc"]) 
+        else:
+            # just use a hashed journal title
+            doc_id = "{}".format(hash(document["metadata"]["journal-title"])/1000000000)
+             
         if "abstract-text" in document:
             content = document["abstract-text"]
-            document["abstract"] = [s for s in self.parser.parse(content)]
+            document["abstract"] = [s for s in self.parser.parse(content,doc_id=doc_id)]
             
         if "abstract-short-text" in document:
             content = document["abstract-short-text"]
-            document["abstract-short"] = [s for s in self.parser.parse(content)]
+            document["abstract-short"] = [s for s in self.parser.parse(content,doc_id=doc_id)]
             
         document["sections"] = []
         for section in document["section-text"]:
             try:
-                section = [s for s in self.parser.parse(section.strip())]
+                section = [s for s in self.parser.parse(section.strip(),doc_id=doc_id)]
                 document["sections"] += [section]
-                
             except Exception as e:
                 print "CoreNLP parsing exception %s" % section     
         
         document["sentences"] = []
-        #if "abstract" in document:
-        #    for section in document["abstract"]:
-        #        document["sentences"] += section
-         
         for section in document["sections"]:
             # HACK -- don't include really long sentences
             document["sentences"] += [s for s in section if len(s.words) <= self.MAX_SENTENCE_LENGTH]

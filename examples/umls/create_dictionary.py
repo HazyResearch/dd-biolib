@@ -10,6 +10,7 @@ Simple UMLS Metathesaurus Dictionary Builder
 from __future__ import print_function
 
 import re
+import sys
 import ontologies.umls as umls
 import argparse
 from sklearn.neighbors import *
@@ -46,7 +47,7 @@ def term_expansion(fpath, terms, knn):
 def main(args):
     
     meta = umls.Metathesaurus()
-    norm = umls.MetaNorm(function=lambda x:x.lower())
+    norm = umls.MetaNorm(function=lambda x:x.lower()) if args.normalize else umls.MetaNorm(function=lambda x:x)
     
     # Build dictionaries for a given a set of semantic types (i.e., entities)
     dictionary = []
@@ -56,13 +57,15 @@ def main(args):
         
     dictionary = {t:1 for t in dictionary}
     
-    print(len(dictionary))
+    print(len(dictionary), file=sys.stderr)
+    
     # Use expanded 
     if args.embeddings:
         terms = term_expansion(args.embeddings, dictionary, args.knn)
         dictionary = {t:1 for t in terms if t not in dictionary and t.lower() not in dictionary}.keys()
     
     # remove terms that are just digits
+    print([term for term in dictionary][0:10])
     dictionary = [term for term in dictionary if not re.match("^(\d+[.]*\d*)|([;:\.!?\-\+]+)$",term)]
     
     for term in sorted(dictionary,key=lambda x:len(x.split()),reverse=1):
@@ -74,6 +77,8 @@ if __name__ == '__main__':
     parser.add_argument("-t","--target", type=str, help="Target entity types, delimit list by |", default=None)
     parser.add_argument("-s","--source_vocab", type=str, 
                         help="limit to source vocabularies, delimit list by |", default=None)
+    parser.add_argument("-n","--normalize", type=bool, 
+                        help="make lowercase", default=False)
     parser.add_argument("-r","--exclude_subtrees", type=str, 
                         help="List of subtree root nodes to remove from the target ontology, delimit list by |", default=None)
     parser.add_argument("-e","--embeddings", type=str, help="word embeddings (default: none)", default=None)

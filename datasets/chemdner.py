@@ -2,8 +2,8 @@ import os
 import codecs
 import cPickle
 from collections import namedtuple
-print 
-from . import *
+from .base import *
+from .tools import unescape_penn_treebank
 #from .utils import unescape_penn_treebank
 #ddbiolib.datasets
 

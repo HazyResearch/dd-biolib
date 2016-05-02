@@ -2,32 +2,43 @@ import bz2
 import sys
 import numpy as np
 import itertools
-from ddlite import SentenceParser,DictionaryMatch,Entities
+from ddlite import SentenceParser,DictionaryMatch,Entities,Union
 from utils import unescape_penn_treebank
 from datasets import NcbiDiseaseCorpus
 
-ROOT = "../../../"
+ROOT = "/Users/fries/dd-bio-examples/"
 INDIR = "/Users/fries/Desktop/dnorm/"
 OUTDIR = "/users/fries/desktop/dnorm/"
 
-def load_disease_dictionary():    
-    dictfile = "{}/datasets/dictionaries/chemdner/stopwords.txt".format(ROOT)
+
+def load_disease_dictionary(rootdir):    
+    dictfile = "{}/data/dicts/stopwords.txt".format(rootdir)
     stopwords = [line.strip().split("\t")[0] for line in open(dictfile).readlines()]
-    
-    dictfile = "{}/datasets/dictionaries/umls/umls_disease_syndrome.bz2".format(ROOT)
+    dictfile = "{}/data/dicts/umls_disorders.bz2".format(rootdir)
     diseases = {line.strip().split("\t")[0]:1 for line in bz2.BZ2File(dictfile, 'rb').readlines()}
     diseases = {word:1 for word in diseases if word not in stopwords}
+    diseases = {word:1 for word in diseases if not word.isupper()}
     
-    dictfile = "{}/datasets/dictionaries/ncbi/ncbi_training_diseases.txt".format(ROOT)
+    dictfile = "{}/data/dicts/ncbi_training_diseases.txt".format(rootdir)
     terms = [line.strip().split("\t")[0] for line in open(dictfile).readlines()]
     diseases.update({word:1 for word in terms if word not in stopwords})
+    diseases = {word:1 for word in terms if not word.isupper()}
     
     return diseases
 
+def load_acronym_dictionary(rootdir):    
+    dictfile = "{}/data/dicts/umls_disorders.bz2".format(rootdir)
+    diseases = {line.strip().split("\t")[0]:1 for line in bz2.BZ2File(dictfile, 'rb').readlines()}
+    diseases = {word:1 for word in diseases if word.isupper()}
+    
+    dictfile = "{}/data/dicts/ncbi_training_diseases.txt".format(rootdir)
+    terms = [line.strip().split("\t")[0] for line in open(dictfile).readlines()]
+    diseases.update({word:1 for word in terms if word.isupper()})
+    
+    return diseases
 
 def create_corpus_dict(corpus, setdef="training"):
     '''Create dictionary using annotated corpus data'''
-    
     dev_set = list(itertools.chain.from_iterable([corpus.cv[setdef].keys() for setdef in [setdef]]))
     documents = [(doc_id,corpus[doc_id]["sentences"],corpus[doc_id]["tags"]) for doc_id in dev_set]
     
@@ -47,6 +58,8 @@ def create_corpus_dict(corpus, setdef="training"):
                 else:
                     d[" ".join(mention)] = 1                    
     return d
+
+
 
 #
 # Corpus
@@ -78,8 +91,19 @@ print len(td)
 #
 # Match Candidates
 #
-diseases = load_disease_dictionary()
-matcher = DictionaryMatch(label='D', dictionary=diseases, ignore_case=True)
+
+diseases = load_disease_dictionary(ROOT)
+acronyms = load_acronym_dictionary(ROOT)
+
+print len(diseases)
+print len(acronyms)
+
+matcher_d = DictionaryMatch(label='D', dictionary=diseases, ignore_case=True)
+matcher_a = DictionaryMatch(label='D', dictionary=acronyms, ignore_case=False)
+
+# dump all candidates to a pickle file
+matcher = Union(matcher_a, matcher_d)
+
 
 #
 # Candidate Recall
@@ -140,7 +164,6 @@ sentences = list(itertools.chain.from_iterable(documents))
 candidates = Entities(sentences, matcher)
 candidates.dump_candidates("{}/all-ncbi-candidates.pkl".format(OUTDIR))
 
-
 pred = [1] * len(candidates)
-corpus.score(candidates,pred,corpus.cv["development"].keys())
-
+scores = corpus.score(candidates,pred,corpus.cv["development"].keys())
+print scores

@@ -5,10 +5,6 @@ import codecs
 from collections import namedtuple
 
 Annotation = namedtuple('Annotation', ['text_type','start','end','text','mention_type'])
-# duplicate sentence oject definition is used to fix pickle issues related to ddlite path
-Sentence = namedtuple('Sentence', ['words', 'lemmas', 'poses', 'dep_parents',
-                                   'dep_labels', 'sent_id', 'doc_id', 'text',
-                                   'token_idxs'])
 
 class Corpus(object):
     

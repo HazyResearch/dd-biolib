@@ -3,7 +3,7 @@ import sys
 import codecs
 import itertools
 from ddlite import SentenceParser,DictionaryMatch,Entities
-from ddbiolib.datasets import PubMedCentralCorpus
+from datasets import PubMedCentralCorpus
 
 #
 # PubMedCentral Corpus
@@ -16,7 +16,6 @@ corpus = PubMedCentralCorpus(inputdir, parser, cache_path="/Users/fries/desktop/
 sentences = [corpus[uid]["sentences"] for uid in corpus.documents.keys()] #[0:1000]
 sentences = list(itertools.chain.from_iterable(sentences))
 
-sys.exit()
 # dictionary matcher
 dictfile = "/Users/fries/Code/fma_anatomy.txt"
 anatomy = {line.strip().split("\t")[0]:1 for line in codecs.open(dictfile,"rU","utf-8").readlines()}
