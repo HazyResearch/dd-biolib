@@ -1,7 +1,0 @@
-eclipse.preferences.version=1
-encoding//examples/pubmed/pmc_corpus_demo.py=utf-8
-encoding//examples/taggers/chemicals/chemical_extraction.py=utf-8
-encoding//examples/taggers/chemicals/chemical_learning.py=utf-8
-encoding//examples/umls/create_dictionary.py=utf-8
-encoding//examples/umls/kb_demo.py=utf-8
-encoding/chemical_extraction_demo.py=utf-8

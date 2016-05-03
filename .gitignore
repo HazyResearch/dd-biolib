@@ -64,6 +64,7 @@ target/
 # Eclipse project files
 .project
 .pydevproject
+.settings/
 
 # OSX system files
 .DS_Store
