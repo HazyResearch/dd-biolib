@@ -68,7 +68,6 @@ class Metathesaurus(object):
             breaks several measures. This adds a simulated root.
             
         """
-        
         # load cached graph
         key = "%s_%s_%s" % (level,".".join(source_vocab),".".join(relation))
         if key in self._networks:

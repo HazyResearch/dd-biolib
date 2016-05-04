@@ -11,26 +11,6 @@ from .tools import unescape_penn_treebank
 import operator
 from cgitb import text
 
-class bcolors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
-
-def highlight_span(text, char_span, window=10):
-    
-    #print char_span
-    pre = text[char_span[0]-window:char_span[0]]
-    span = text[char_span[0]:char_span[1]]
-    post = text[char_span[1]:char_span[1]+window]
-    s = "{}{}{}{}{}{}\n".format(pre,bcolors.BOLD, bcolors.WARNING,span,bcolors.ENDC,post)
-    return s
-           
-
 class NcbiDiseaseCorpus(Corpus):
     '''The NCBI disease corpus is fully annotated at the mention and concept level 
     to serve as a research resource for the biomedical natural language processing 
@@ -108,6 +88,23 @@ class NcbiDiseaseCorpus(Corpus):
         
         return ground_truth
     
+    def gold_labels(self,candidates):
+        '''Given a set of candidates, generate -1,1 labels using internal
+        gold label data
+        '''
+        doc_ids = {c.doc_id:1 for c in candidates} 
+        true_labels = set(self._ground_truth(doc_ids))
+        
+        gold = [0] * len(candidates)
+        for idx,c in enumerate(candidates):
+            text = "".join([c.words[i] for i in c.idxs])
+            char_span = [c.token_idxs[i] for i in c.idxs]
+            char_span = (char_span[0], char_span[-1] + len(c.words[c.idxs[-1]]))
+            mention = (c.doc_id, c.sent_id, tuple(c.idxs), char_span, text)
+            gold[idx] = 1 if mention in true_labels else -1
+        
+        return gold
+    
     def score(self, candidates, prediction, doc_ids=None):
         '''Given a set of candidates, compute true precision, recall, f1
         using gold labeled benchmark data (this includes non-candidate entities,
@@ -132,18 +129,13 @@ class NcbiDiseaseCorpus(Corpus):
         tp = true_labels.intersection(mentions)
         fp = mentions.difference(tp)
         fn = true_labels.difference(tp)
-        
-        print len(true_labels)
-        print len(mentions)
-        print len(tp),"tp"
-        print len(fp),"fp"
-        print len(fn),"fn"
-           
+          
         r = len(tp) / float(len(true_labels))
         p = len(tp) / float(len(tp) + len(fp))
         f1 = 2.0 * (p * r) / (p + r)
 
-        return {"precision":p, "recall":r,"f1":f1}
+        return {"precision":p, "recall":r,"f1":f1, 
+                "tp":len(tp), "fp":len(fp), "fn":len(fn)}
     
     def error_analysis(self,candidates, prediction, doc_ids=None):
         ''' Specific types of errors

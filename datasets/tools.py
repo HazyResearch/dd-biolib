@@ -17,3 +17,25 @@ def unescape_penn_treebank(words):
             words[i] = '"'
             rm = False        
     return words
+
+#
+# Terminal Span Highlighting
+#
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+def highlight_span(text, char_span, window=10):
+    
+    #print char_span
+    pre = text[char_span[0]-window:char_span[0]]
+    span = text[char_span[0]:char_span[1]]
+    post = text[char_span[1]:char_span[1]+window]
+    s = "{}{}{}{}{}{}\n".format(pre,bcolors.BOLD, bcolors.WARNING,span,bcolors.ENDC,post)
+    return s

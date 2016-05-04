@@ -35,7 +35,7 @@ class SemanticNetwork(object):
         
     def __load_sem_groups(self):
         '''
-        UMLS Semantic Groups 
+        UMLS Semantic Groups(
         ACTI|Activities & Behaviors|T051|Event
         '''
         fname = "%s/data/SemGroups.txt" % (module_path)
