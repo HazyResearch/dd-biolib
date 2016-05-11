@@ -18,6 +18,9 @@ def unescape_penn_treebank(words):
             rm = False        
     return words
 
+def overlaps(a,b):
+    return len(set(a).intersection(b)) != 0
+    
 #
 # Terminal Span Highlighting
 #

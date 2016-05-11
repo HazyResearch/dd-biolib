@@ -2,14 +2,10 @@ import os
 import sys
 import codecs
 import cPickle
-import itertools
-#from ddlite.ddbiolib.datasets import *
-#from ddlite.ddbiolib.utils import unescape_penn_treebank
-from .base import *
-from .tools import unescape_penn_treebank
-
 import operator
-from cgitb import text
+import itertools
+from .base import *
+from .tools import unescape_penn_treebank,overlaps
 
 class NcbiDiseaseCorpus(Corpus):
     '''The NCBI disease corpus is fully annotated at the mention and concept level 
@@ -64,11 +60,16 @@ class NcbiDiseaseCorpus(Corpus):
     
     def _ground_truth(self,doc_ids):
         '''Build ground truth (doc_id,sent_id,char_offset) mentions'''
-        documents = [(doc_id, self.__getitem__(doc_id)["sentences"], 
-                      self.__getitem__(doc_id)["tags"]) for doc_id in doc_ids]     
+        #documents = [(doc_id, self.__getitem__(doc_id)["sentences"], 
+        #              self.__getitem__(doc_id)["tags"]) for doc_id in doc_ids]     
           
         ground_truth = []
-        for pmid,doc,labels in documents:
+        #for pmid,doc,labels in documents:
+        
+        for pmid in doc_ids:
+            doc = self.__getitem__(pmid)["sentences"]
+            labels = self.__getitem__(pmid)["tags"]
+            
             for sent_id in range(0,len(doc)):
                 for tag in labels[sent_id]:
                 
@@ -115,10 +116,13 @@ class NcbiDiseaseCorpus(Corpus):
         doc_ids = {c.doc_id:1 for c in candidates} if not doc_ids else dict.fromkeys(doc_ids)
         # compute original document character offsets for each mention
         mentions = []
-        for c in candidates:
+        for i,c in enumerate(candidates):
             if c.doc_id not in doc_ids:
                 continue
-            text = "".join([c.words[i] for i in c.idxs])
+            if prediction[i] != 1:
+                continue
+            words = unescape_penn_treebank([c.words[i] for i in c.idxs])
+            text = "".join(words)
             char_span = [c.token_idxs[i] for i in c.idxs]
             char_span = (char_span[0], char_span[-1] + len(c.words[c.idxs[-1]]))
             mentions += [(c.doc_id, c.sent_id, tuple(c.idxs), char_span, text)]
@@ -129,76 +133,174 @@ class NcbiDiseaseCorpus(Corpus):
         tp = true_labels.intersection(mentions)
         fp = mentions.difference(tp)
         fn = true_labels.difference(tp)
-          
+        
+        print len(tp),len(fp),len(fn),len(true_labels)
+        #for item in fn:
+        #    print "FN",item
+        
+        #for item in fn:
+        #    print "FP",item
         r = len(tp) / float(len(true_labels))
         p = len(tp) / float(len(tp) + len(fp))
         f1 = 2.0 * (p * r) / (p + r)
 
         return {"precision":p, "recall":r,"f1":f1, 
                 "tp":len(tp), "fp":len(fp), "fn":len(fn)}
+        
+        
     
     def error_analysis(self,candidates, prediction, doc_ids=None):
         ''' Specific types of errors
-        1: subsequence candidate: "hereditary breast cancers" vs. "breast cancers"
-        2: tokenization error / subcharacter sequence 
         '''
         doc_ids = {c.doc_id:1 for c in candidates} if not doc_ids else dict.fromkeys(doc_ids)
         
         # ground truth annotation index
         label_idx = {}
-        for doc_id in self.annotations:
-            label_idx[doc_id] = {}
-            for label in self.annotations[doc_id]:
-                label_idx[doc_id][(label.start,label.end)] = (label.text, label.mention_type)
-        
+        for pmid in doc_ids:
+            label_idx[pmid] = {}
+            doc = self.__getitem__(pmid)
+            for sentence,tags in zip(doc["sentences"],doc["tags"]):
+                if sentence.sent_id not in label_idx[pmid]:
+                    label_idx[pmid][sentence.sent_id] = {}
+                for text,offset in tags:
+                    label_idx[pmid][sentence.sent_id][offset] = text
+                
         # mention offsets
         mentions = []
+        candidate_idx = {}
         for c in candidates:
             if c.doc_id not in doc_ids:
                 continue
-            text = "".join([c.words[i] for i in c.idxs])
+            words = unescape_penn_treebank([c.words[i] for i in c.idxs])
+            text = "".join(words)
             char_span = [c.token_idxs[i] for i in c.idxs]
             char_span = (char_span[0],char_span[-1] + len(c.words[c.idxs[-1]]))
-            mentions += [(c.doc_id, c.sent_id, tuple(c.idxs), char_span, text)]
-        
+            
+            if prediction[i] == 1:
+                mentions += [(c.doc_id, c.sent_id, tuple(c.idxs), char_span, text)]
+            
+            # create candidate index
+            if c.doc_id not in candidate_idx:
+                candidate_idx[c.doc_id] = {}
+            if c.sent_id not in candidate_idx[c.doc_id]:
+                candidate_idx[c.doc_id][c.sent_id] = {}
+            span = (min(c.idxs),max(c.idxs)+1)
+            candidate_idx[c.doc_id][c.sent_id][span] = " ".join([c.words[i] for i in c.idxs])
+             
+            
         mentions = set(mentions) 
         true_labels = set(self._ground_truth(doc_ids))
         
         tp = true_labels.intersection(mentions)
         fp = mentions.difference(tp)
         fn = true_labels.difference(tp)
-        
-        print "tp:{} fp:{} fn:{}".format(len(tp),len(fp),len(fn))
-        
-        # False Negatives
-        errors = {"tokenization":0,"oov":0,"subsequence":0}
-        for item in fn:    
-            pmid,sent_id,idxs,char_span,txt = item    
-            text = "{} {}".format(self.documents[pmid]["title"],self.documents[pmid]["body"])
-            tokenized = self.documents[pmid]["sentences"][sent_id].words[min(idxs):max(idxs)+1]
-            tokenized = unescape_penn_treebank(tokenized)
-            true_mention = text[char_span[0]:char_span[1]]
-            
-            if true_mention.replace(" ","") != "".join(tokenized):
-                errors["tokenization"] += 1
-            
-
+                
+        #
         # False Positives
-        overlap = {}
-        for item in fp:
-            pmid,sent_id,idxs,char_span,txt = item
-            text = "{} {}".format(self.documents[pmid]["title"],self.documents[pmid]["body"])
-            # does the provided character span overlap
-            i,j = char_span
-            for cspan in label_idx[pmid]:
-                if i >= cspan[0] and i <= cspan[1]:
-                    m = text[char_span[0]:char_span[1]]
-                    errors["subsequence"] += 1
-                    key = (pmid,cspan)
-                    overlap[key] = overlap.get(key,0) + 1
-        print len(overlap)
-        print errors
-        return 
+        #
+        complete_fp = {}
+        partial = {}
+        partial_labeling = {}
+        
+        fp_partial = [0] * len(fp)
+        
+        for i,c in enumerate(fp):
+            doc_id,sent_id,offset,char_offset,text = c
+            offset = list(offset) 
+            offset = tuple([min(offset), max(offset) + 1])
+            
+            # look for subsequence matches
+            if doc_id in label_idx and sent_id in label_idx[doc_id]:
+                for span in label_idx[doc_id][sent_id]:
+                    if overlaps(range(*span),range(*offset)):
+                        key = "{}:{}:{}".format(doc_id,sent_id,span)
+                        partial[key] = partial.get(key,0) + 1
+                        partial_labeling[key] = partial_labeling.get(key,[]) + [c]
+                        fp_partial[i] = 1
+                        break
+            
+            # no partial match -- completely wrong
+            if not fp_partial[i]:
+                text = candidate_idx[doc_id][sent_id][offset]
+                complete_fp[text] = complete_fp.get(text,0) + 1
+    
+        num_partial = sum(partial.values())
+        num_complete_fp = sum(complete_fp.values())
+        print "FP:{} partial TP:{} fully FP:{}".format(len(fp),num_partial,num_complete_fp)
+        
+        extra = {}
+        missed = {}
+        
+        # show partial match errors
+        for x in partial:
+            doc_id,sent_id,span = x.split(":")
+            span = tuple(map(int,eval(span)))
+            sent_id = int(sent_id)
+            
+            label_text = label_idx[doc_id][sent_id][span]
+            
+            # multiple pieces
+            pieces = []
+            for plabel in partial_labeling[x]:
+                doc_id,sent_id,span,char_span,_ = plabel
+                span = list(span) 
+                span = tuple([min(span), max(span) + 1])
+                pieces += [candidate_idx[doc_id][sent_id][span]]
+            
+            '''
+            if len(pieces) > 1:
+                print "label",label_text
+                print "pieces",pieces
+                print
+            '''
+            for t in pieces:
+                # span is longer than gold label (extra words)
+                if label_text in t:
+                    t = t.replace(label_text,"<>").lower().strip()
+                    t = map(lambda x:x.strip(),t.strip().lower().split("<>"))
+                    t = tuple(t)
+                    extra[t] = extra.get(t,0) + 1
+                else:
+                    label_text = label_text.replace(t,"<>")
+            
+            
+            t = map(lambda x:x.strip(),label_text.strip().lower().split("<>"))
+            t = tuple(t)
+            missed[t] = missed.get(t,0) + 1
+        
+        '''
+        # incorrect modifiers (candidate is too long)
+        tmpl = []
+        for item in sorted(extra.items(),key=lambda x:x[1],reverse=1):
+            print item
+        print "-----"
+        # missed modifiers (candidate is too short)
+        left,right = {},{}
+        for item in sorted(missed.items(),key=lambda x:x[1],reverse=1):
+            pattern,freq = item   
+            if "" in pattern:
+                if pattern[0] == "" and len(pattern[1].split()) == 1:
+                    right[pattern[1]] = 1
+                elif pattern[-1] == "" and len(pattern[0].split()) == 1:
+                    left[pattern[0]] = 1
+                    
+        print right.keys()
+        print left.keys()
+        '''
+        #
+        # False Negatives
+        #
+        num_partial_matches = 0
+        for c in fn:
+            pmid,sent_id,offset,char_offset,text = c
+            offset = list(offset) 
+            offset = tuple([min(offset), max(offset) + 1])
+            key = "{}:{}:{}".format(pmid,sent_id,offset)
+            if key in partial:
+                num_partial_matches += 1
+         
+        print "FN:{} partial TP:{} fully FN:{}".format(len(fn),num_partial_matches,len(fn)-num_partial_matches)
+              
     
         '''
         # aggregate errors by category

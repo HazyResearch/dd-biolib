@@ -24,22 +24,34 @@ ROOT = "../../../"
 INDIR = "/Users/fries/Desktop/dnorm/"
 OUTDIR = "/users/fries/desktop/dnorm/"
 
+#INDIR = "/Users/fries/workspace/dd-bio-examples/candidates/jason/diseases/v3/"
+#OUTDIR = "/Users/fries/workspace/dd-bio-examples/candidates/jason/diseases/v3/"
 
 cache = "{}/cache3/".format(INDIR)
 infile = "{}/disease_names/".format(INDIR)
 
-parser = SentenceParser()
+parser = None# SentenceParser()
 corpus = NcbiDiseaseCorpus(infile, parser, cache_path=cache)
 
-#
-# Training 
-#
-candidates = Entities("{}training-ncbi-candidates.pkl".format(OUTDIR))
-print "{} candidates".format(len(candidates))
-pred = [1] * len(candidates)
-scores = corpus.score(candidates,pred,corpus.cv["training"].keys())
-print "training", scores
+# score
+candidates = Entities("{}{}-ncbi-candidates.pkl".format(OUTDIR,"training"))
+candidates._candidates += Entities("{}{}-ncbi-candidates.pkl".format(OUTDIR,"development"))
 
+prediction = np.load("/users/fries/desktop/debug_gold.npy")
+
+
+gold_labels = corpus.gold_labels(candidates)
+
+
+holdout = corpus.cv["development"].keys() 
+scores = corpus.score(candidates,prediction,holdout)
+print scores
+
+
+corpus.error_analysis(candidates,prediction,holdout)
+
+sys.exit()
+'''
 #
 # Development 
 #
@@ -50,7 +62,5 @@ pred = [1] * len(candidates)
 scores = corpus.score(candidates,pred,corpus.cv["development"].keys())
 print "development", scores
 
-
-
-
 corpus.error_analysis(candidates,pred,corpus.cv["development"].keys())
+'''
