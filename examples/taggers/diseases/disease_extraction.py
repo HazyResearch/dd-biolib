@@ -69,7 +69,6 @@ def load_disease_dictionary(rootdir):
     stopwords = [line.strip().split("\t")[0] for line in open(dictfile).readlines()]
     diseases = {word:1 for word in diseases if word.lower() not in stopwords}  
     
-    
     return diseases
 
 def load_acronym_dictionary(rootdir):    
@@ -170,8 +169,8 @@ for cv_set in holdouts:
     scores["num_candidates"] += len(candidates)
     scores["num_cand_tokens"] += sum([len(c.idxs) for c in candidates])
     
-    np.save("{}/{}-ncbi-diseases-gold.npy".format(OUTDIR,cv_set), gold_labels)
-    candidates.dump_candidates("{}/{}-ncbi-candidates.pkl".format(OUTDIR,cv_set))
+    np.save("{}/{}-ncbi-diseases-gold-v2.npy".format(OUTDIR,cv_set), gold_labels)
+    candidates.dump_candidates("{}/{}-ncbi-candidates-v2.pkl".format(OUTDIR,cv_set))
 
 
 # candidate recall

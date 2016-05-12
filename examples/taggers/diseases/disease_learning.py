@@ -7,6 +7,25 @@ from ddlite import SentenceParser,DictionaryMatch,Entities,CandidateModel
 from utils import unescape_penn_treebank
 from datasets import NcbiDiseaseCorpus
 
+from sklearn.metrics import precision_score,recall_score
+
+def find_duplicates(candidates):
+    
+    for i in range(0,len(candidates)):
+        for j in range(i+1,len(candidates)):
+            
+            a = candidates[i]
+            b = candidates[j]
+            
+            if a.idxs==b.idxs and a.doc_id==b.doc_id and a.sent_id==b.sent_id:
+                print a.doc_id, a.sent_id, a.mention()
+                print b.doc_id, b.sent_id, b.mention()
+                print
+                
+            #if candidates[i]== candidates[j]:
+            #    print "WTF"
+    
+
 def corpus_mention_summary(corpus):
     '''The raw corpus doesn't match the statistics provided at
     http://www.ncbi.nlm.nih.gov/CBBresearch/Dogan/DISEASE/corpus.html
@@ -20,24 +39,57 @@ def corpus_mention_summary(corpus):
         num_mentions = sum([len(corpus.annotations[doc_id]) for doc_id in doc_ids])
         print holdout,num_mentions, len(doc_ids)
 
+
 ROOT = "../../../"
-INDIR = "/Users/fries/Desktop/dnorm/"
+INDIR = ""
 OUTDIR = "/users/fries/desktop/dnorm/"
 
 #INDIR = "/Users/fries/workspace/dd-bio-examples/candidates/jason/diseases/v3/"
-#OUTDIR = "/Users/fries/workspace/dd-bio-examples/candidates/jason/diseases/v3/"
+CANDIDATE_DIR = "/Users/fries/workspace/dd-bio-examples/candidates/jason/diseases/v4/"
 
-cache = "{}/cache3/".format(INDIR)
-infile = "{}/disease_names/".format(INDIR)
+cache = "/Users/fries/Desktop/dnorm/cache3/"
+infile = "/Users/fries/Desktop/dnorm/disease_names/"
 
 parser = None# SentenceParser()
 corpus = NcbiDiseaseCorpus(infile, parser, cache_path=cache)
 
+num_training = len(Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,"training"))) 
+num_developent = len(Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,"development")))
+
+
+#debug = "/Users/fries/workspace/dd-bio-examples/candidates/jason/diseases/v4/development-ncbi-candidates.pkl"
+candidates = Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,"development"))
+
+#candidates = Entities(debug)
+
+#find_duplicates(candidates)
+#sys.exit()
+
+prediction = np.load("/users/fries/desktop/debug_gold.npy")
+prediction = prediction[num_training:]
+gold_labels = corpus.gold_labels(candidates)
+
+# sklearn santity check (should match ddlite scores)
+gold_labels = [1 if x==1 else 0 for x in gold_labels]
+prediction = [1 if x==1 else 0 for x in prediction]
+print precision_score(gold_labels, prediction)
+print recall_score(gold_labels, prediction)
+
+holdout = corpus.cv["development"].keys() 
+scores = corpus.score(candidates,prediction,holdout)
+print "Scores:",scores
+
+# error analysis
+
+
+'''
 # score
 candidates = Entities("{}{}-ncbi-candidates.pkl".format(OUTDIR,"training"))
 candidates._candidates += Entities("{}{}-ncbi-candidates.pkl".format(OUTDIR,"development"))
-
 prediction = np.load("/users/fries/desktop/debug_gold.npy")
+
+candidates._candidates = candidates._candidates[num_training:]
+prediction = prediction[num_training:]
 
 
 gold_labels = corpus.gold_labels(candidates)
@@ -45,12 +97,12 @@ gold_labels = corpus.gold_labels(candidates)
 
 holdout = corpus.cv["development"].keys() 
 scores = corpus.score(candidates,prediction,holdout)
-print scores
+print "Scores:",scores
 
-
-corpus.error_analysis(candidates,prediction,holdout)
+#corpus.error_analysis(candidates,prediction,holdout)
 
 sys.exit()
+'''
 '''
 #
 # Development 

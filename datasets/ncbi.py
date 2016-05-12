@@ -4,6 +4,7 @@ import codecs
 import cPickle
 import operator
 import itertools
+import numpy as np
 from .base import *
 from .tools import unescape_penn_treebank,overlaps
 
@@ -104,7 +105,7 @@ class NcbiDiseaseCorpus(Corpus):
             mention = (c.doc_id, c.sent_id, tuple(c.idxs), char_span, text)
             gold[idx] = 1 if mention in true_labels else -1
         
-        return gold
+        return np.array(gold)
     
     def score(self, candidates, prediction, doc_ids=None):
         '''Given a set of candidates, compute true precision, recall, f1
@@ -115,31 +116,27 @@ class NcbiDiseaseCorpus(Corpus):
         # create doc set from candidate pool OR a provided doc_id set
         doc_ids = {c.doc_id:1 for c in candidates} if not doc_ids else dict.fromkeys(doc_ids)
         # compute original document character offsets for each mention
-        mentions = []
+        mentions = {}
         for i,c in enumerate(candidates):
             if c.doc_id not in doc_ids:
                 continue
             if prediction[i] != 1:
                 continue
+            
             words = unescape_penn_treebank([c.words[i] for i in c.idxs])
             text = "".join(words)
             char_span = [c.token_idxs[i] for i in c.idxs]
             char_span = (char_span[0], char_span[-1] + len(c.words[c.idxs[-1]]))
-            mentions += [(c.doc_id, c.sent_id, tuple(c.idxs), char_span, text)]
-        
-        mentions = set(mentions) 
+            entity = (c.doc_id, c.sent_id, tuple(c.idxs), char_span, text)    
+            mentions[entity] = mentions.get(entity,0) + 1
+            
+        mentions = set(mentions.keys()) 
         true_labels = set(self._ground_truth(doc_ids))
         
         tp = true_labels.intersection(mentions)
         fp = mentions.difference(tp)
         fn = true_labels.difference(tp)
         
-        print len(tp),len(fp),len(fn),len(true_labels)
-        #for item in fn:
-        #    print "FN",item
-        
-        #for item in fn:
-        #    print "FP",item
         r = len(tp) / float(len(true_labels))
         p = len(tp) / float(len(tp) + len(fp))
         f1 = 2.0 * (p * r) / (p + r)
@@ -171,6 +168,7 @@ class NcbiDiseaseCorpus(Corpus):
         for c in candidates:
             if c.doc_id not in doc_ids:
                 continue
+            
             words = unescape_penn_treebank([c.words[i] for i in c.idxs])
             text = "".join(words)
             char_span = [c.token_idxs[i] for i in c.idxs]
@@ -186,15 +184,19 @@ class NcbiDiseaseCorpus(Corpus):
                 candidate_idx[c.doc_id][c.sent_id] = {}
             span = (min(c.idxs),max(c.idxs)+1)
             candidate_idx[c.doc_id][c.sent_id][span] = " ".join([c.words[i] for i in c.idxs])
-             
-            
+        
         mentions = set(mentions) 
         true_labels = set(self._ground_truth(doc_ids))
-        
         tp = true_labels.intersection(mentions)
         fp = mentions.difference(tp)
         fn = true_labels.difference(tp)
-                
+        
+        print "-----------------------------"
+        print len(mentions)
+        print "TP:{} FP:{} FN:{} True_N:{}".format(len(tp),len(fp),len(fn),len(true_labels))
+        print "-----------------------------"
+        
+        
         #
         # False Positives
         #
@@ -247,12 +249,6 @@ class NcbiDiseaseCorpus(Corpus):
                 span = tuple([min(span), max(span) + 1])
                 pieces += [candidate_idx[doc_id][sent_id][span]]
             
-            '''
-            if len(pieces) > 1:
-                print "label",label_text
-                print "pieces",pieces
-                print
-            '''
             for t in pieces:
                 # span is longer than gold label (extra words)
                 if label_text in t:
@@ -268,25 +264,9 @@ class NcbiDiseaseCorpus(Corpus):
             t = tuple(t)
             missed[t] = missed.get(t,0) + 1
         
-        '''
-        # incorrect modifiers (candidate is too long)
-        tmpl = []
-        for item in sorted(extra.items(),key=lambda x:x[1],reverse=1):
-            print item
-        print "-----"
-        # missed modifiers (candidate is too short)
-        left,right = {},{}
-        for item in sorted(missed.items(),key=lambda x:x[1],reverse=1):
-            pattern,freq = item   
-            if "" in pattern:
-                if pattern[0] == "" and len(pattern[1].split()) == 1:
-                    right[pattern[1]] = 1
-                elif pattern[-1] == "" and len(pattern[0].split()) == 1:
-                    left[pattern[0]] = 1
-                    
-        print right.keys()
-        print left.keys()
-        '''
+        
+        
+    
         #
         # False Negatives
         #
