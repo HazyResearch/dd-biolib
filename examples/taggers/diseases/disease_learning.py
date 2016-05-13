@@ -55,31 +55,49 @@ corpus = NcbiDiseaseCorpus(infile, parser, cache_path=cache)
 
 num_training = len(Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,"training"))) 
 num_developent = len(Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,"development")))
-
+num_testing = len(Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,"testing")))
 
 #debug = "/Users/fries/workspace/dd-bio-examples/candidates/jason/diseases/v4/development-ncbi-candidates.pkl"
-candidates = Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,"development"))
+#candidates = Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,"development"))
+candidates = Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,"testing"))
 
-#candidates = Entities(debug)
+#holdout = corpus.cv["development"].keys() 
+holdout = corpus.cv["testing"].keys() 
 
-#find_duplicates(candidates)
-#sys.exit()
+# candidate recall
+# -------------------------------------------------------
+print "CANDIDATE RECALL"
+prediction = len(candidates) * [1]
+scores = corpus.score(candidates,prediction,holdout)
+print scores
+# -------------------------------------------------------
 
-prediction = np.load("/users/fries/desktop/debug_gold.npy")
+#prediction = np.load("/users/fries/desktop/debug_gold.npy")
+prediction = np.load("/Users/fries/workspace/dd-bio-examples/data/ncbi-test-predictions.npy")
+print prediction.shape
 prediction = prediction[num_training:]
 gold_labels = corpus.gold_labels(candidates)
 
+
+
 # sklearn santity check (should match ddlite scores)
+# -------------------------------------------------------
 gold_labels = [1 if x==1 else 0 for x in gold_labels]
 prediction = [1 if x==1 else 0 for x in prediction]
-print precision_score(gold_labels, prediction)
-print recall_score(gold_labels, prediction)
+print "ddlite precision:", precision_score(gold_labels, prediction)
+print "ddlite recall:   ", recall_score(gold_labels, prediction)
+# -------------------------------------------------------
 
-holdout = corpus.cv["development"].keys() 
+
+#holdout = corpus.cv["training"].keys() 
 scores = corpus.score(candidates,prediction,holdout)
 print "Scores:",scores
+print "====================================================="
+
+corpus.error_analysis_2(candidates,prediction,holdout)
 
 # error analysis
+#scores = corpus.error_analysis(candidates,prediction,holdout)
 
 
 '''
