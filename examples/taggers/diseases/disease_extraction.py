@@ -1,17 +1,20 @@
 import bz2
 import sys
 import csv
+import re
 import numpy as np
 import itertools
 import cPickle
-from ddlite import SentenceParser,DictionaryMatch,Entities,Union
+import ddlite
+from ddlite import SentenceParser,Entities
+from ddlite import Union, DictionaryMatch, RegexNgramMatch
 from utils import unescape_penn_treebank
 from datasets import NcbiDiseaseCorpus
 
 ROOT = "/Users/fries/dd-bio-examples/"
 INDIR = "/Users/fries/Desktop/dnorm/"
-OUTDIR = "/users/fries/desktop/dnorm/"
-
+#OUTDIR = "/users/fries/desktop/dnorm/"
+OUTDIR = "/Users/fries/Desktop/dnorm/candidates/v5/"
 
 def load_bioportal_csv_dictionary(filename):
     '''BioPortal Ontologies
@@ -151,11 +154,47 @@ diseases = load_disease_dictionary(ROOT)
 acronyms = load_acronym_dictionary(ROOT)
 
 matcher_d = DictionaryMatch(label='D', dictionary=diseases, ignore_case=True)
+
+#matcher_tags = TagMatch(tag="JJ")
+#concat_matcher = Concat(matcher_tags,matcher_d)
+
 matcher_a = DictionaryMatch(label='D', dictionary=acronyms, ignore_case=False)
 matcher = Union(matcher_a, matcher_d)
 
+#pattern = re.compile("((JJ|VBN)\s)+(NN[SP]*\s*)+")
+#pattern = re.compile("((NN[SP]*|JJ)\s*){2,}")
+pattern = re.compile("((NN[SP]*|JJ|IN DT)\s*){2,}") #of the/ in the
+
+matcher_tags = RegexNgramMatch(label="D",match_attrib="poses",regex_pattern=pattern,ignore_case=False)
+
+matcher = Union(matcher_a, matcher_d, matcher_tags)
+#matcher = matcher_tags
+
 gold_labels = []
 scores = {"num_candidates":0, "num_cand_tokens":0}
+
+
+# DEBUG
+'''
+sentences = [corpus[doc_id]["sentences"] for doc_id in ['9472666']]
+sentences = list(itertools.chain.from_iterable(sentences))
+candidates = Entities(sentences, matcher)
+for c in candidates:
+    print c.mention(), [c.poses[i] for i in c.idxs]
+
+for sentence in corpus['9472666']["sentences"]:
+    print sentence.words, sentence.poses
+
+pred = [1] * len(candidates)
+tp,fp,fn = corpus.classification_errors(candidates, pred)
+for item in fn:
+    doc_id,sent_id,idxs,char_span,txt = item
+    print [corpus[doc_id]['sentences'][sent_id].words[i] for i in idxs]
+    print [corpus[doc_id]['sentences'][sent_id].poses[i] for i in idxs]
+    print
+    
+sys.exit()
+'''
 
 for cv_set in holdouts:
     sentences = [corpus[doc_id]["sentences"] for doc_id in corpus.cv[cv_set]]
@@ -164,19 +203,30 @@ for cv_set in holdouts:
     candidates = Entities(sentences, matcher)
     gold_labels = corpus.gold_labels(candidates)
     
+    for c in candidates:
+        print c.mention(), [c.poses[i] for i in c.idxs]
+    
     pred = [1] * len(candidates)
     scores[cv_set] = corpus.score(candidates, pred)
     scores["num_candidates"] += len(candidates)
     scores["num_cand_tokens"] += sum([len(c.idxs) for c in candidates])
     
-    np.save("{}/{}-ncbi-diseases-gold-v2.npy".format(OUTDIR,cv_set), gold_labels)
-    candidates.dump_candidates("{}/{}-ncbi-candidates-v2.pkl".format(OUTDIR,cv_set))
+    
+    tp,fp,fn = corpus.classification_errors(candidates, pred)
+    
+    for item in fn:
+        doc_id,sent_id,idxs,char_span,txt = item
+        print [corpus[doc_id]['sentences'][sent_id].words[i] for i in idxs]
+        print [corpus[doc_id]['sentences'][sent_id].poses[i] for i in idxs]
+        print
+    np.save("{}/{}-ncbi-diseases-gold.npy".format(OUTDIR,cv_set), gold_labels)
+    candidates.dump_candidates("{}/{}-ncbi-candidates.pkl".format(OUTDIR,cv_set))
 
 
 # candidate recall
 print("Found %d candidate entities (%.2f%% of all tokens)" % (scores["num_candidates"],
                                                               scores["num_cand_tokens"]/float(num_tokens)*100)) 
-for cv_set in ["training","development"]:
+for cv_set in ["training","development","testing"]:
     print("[{0}] candidate recall: {1:0.2f}% ({2}/{3})".format(cv_set.upper(),scores[cv_set]["recall"]*100,
                                                              scores[cv_set]["tp"], 
                                                              scores[cv_set]["tp"]+ scores[cv_set]["fn"]))

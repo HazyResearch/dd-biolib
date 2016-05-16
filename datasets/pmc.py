@@ -37,7 +37,9 @@ class PubMedAbstractCorpus(Corpus):
             doc_str = "{} {}".format(self.documents[pmid]["title"],self.documents[pmid]["body"])
             #title = [s for s in self.parser.parse(self.documents[pmid]["title"],doc_id=pmid)]
             #body = [s for s in self.parser.parse(self.documents[pmid]["body"],doc_id=pmid)]
+            
             sentences = [s for s in self.parser.parse(doc_str,doc_id=pmid)]
+            #sentences = title + body
             self.documents[pmid]["sentences"] = sentences
             
             with open(pkl_file, 'w+') as f:

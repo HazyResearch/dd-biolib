@@ -21,10 +21,7 @@ def find_duplicates(candidates):
                 print a.doc_id, a.sent_id, a.mention()
                 print b.doc_id, b.sent_id, b.mention()
                 print
-                
-            #if candidates[i]== candidates[j]:
-            #    print "WTF"
-    
+           
 
 def corpus_mention_summary(corpus):
     '''The raw corpus doesn't match the statistics provided at
@@ -41,10 +38,7 @@ def corpus_mention_summary(corpus):
 
 
 ROOT = "../../../"
-INDIR = ""
 OUTDIR = "/users/fries/desktop/dnorm/"
-
-#INDIR = "/Users/fries/workspace/dd-bio-examples/candidates/jason/diseases/v3/"
 CANDIDATE_DIR = "/Users/fries/workspace/dd-bio-examples/candidates/jason/diseases/v4/"
 
 cache = "/Users/fries/Desktop/dnorm/cache3/"
@@ -57,24 +51,20 @@ num_training = len(Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,"tra
 num_developent = len(Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,"development")))
 num_testing = len(Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,"testing")))
 
-#debug = "/Users/fries/workspace/dd-bio-examples/candidates/jason/diseases/v4/development-ncbi-candidates.pkl"
-#candidates = Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,"development"))
-candidates = Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,"testing"))
 
-#holdout = corpus.cv["development"].keys() 
-holdout = corpus.cv["testing"].keys() 
+cv = "testing"
+candidates = Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,cv))
+holdout = corpus.cv[cv].keys() 
 
-# candidate recall
 # -------------------------------------------------------
+# candidate recall
 print "CANDIDATE RECALL"
 prediction = len(candidates) * [1]
 scores = corpus.score(candidates,prediction,holdout)
 print scores
 # -------------------------------------------------------
 
-#prediction = np.load("/users/fries/desktop/debug_gold.npy")
-prediction = np.load("/Users/fries/workspace/dd-bio-examples/data/ncbi-test-predictions.npy")
-print prediction.shape
+prediction = np.load("/Users/fries/workspace/dd-bio-examples/data/ncbi-{}-predictions.npy".format(cv))
 prediction = prediction[num_training:]
 gold_labels = corpus.gold_labels(candidates)
 
@@ -92,45 +82,5 @@ print "ddlite recall:   ", recall_score(gold_labels, prediction)
 #holdout = corpus.cv["training"].keys() 
 scores = corpus.score(candidates,prediction,holdout)
 print "Scores:",scores
-print "====================================================="
 
-corpus.error_analysis_2(candidates,prediction,holdout)
-
-# error analysis
-#scores = corpus.error_analysis(candidates,prediction,holdout)
-
-
-'''
-# score
-candidates = Entities("{}{}-ncbi-candidates.pkl".format(OUTDIR,"training"))
-candidates._candidates += Entities("{}{}-ncbi-candidates.pkl".format(OUTDIR,"development"))
-prediction = np.load("/users/fries/desktop/debug_gold.npy")
-
-candidates._candidates = candidates._candidates[num_training:]
-prediction = prediction[num_training:]
-
-
-gold_labels = corpus.gold_labels(candidates)
-
-
-holdout = corpus.cv["development"].keys() 
-scores = corpus.score(candidates,prediction,holdout)
-print "Scores:",scores
-
-#corpus.error_analysis(candidates,prediction,holdout)
-
-sys.exit()
-'''
-'''
-#
-# Development 
-#
-candidates = Entities("{}development-ncbi-candidates.pkl".format(OUTDIR))
-print "{} candidates".format(len(candidates))
-
-pred = [1] * len(candidates)
-scores = corpus.score(candidates,pred,corpus.cv["development"].keys())
-print "development", scores
-
-corpus.error_analysis(candidates,pred,corpus.cv["development"].keys())
-'''
+corpus.error_analysis(candidates,prediction,holdout)
