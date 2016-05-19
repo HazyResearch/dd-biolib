@@ -6,7 +6,6 @@ import itertools
 from ddlite import SentenceParser,DictionaryMatch,Entities,CandidateModel
 from utils import unescape_penn_treebank
 from datasets import NcbiDiseaseCorpus
-
 from sklearn.metrics import precision_score,recall_score
 
 def find_duplicates(candidates):
@@ -39,7 +38,7 @@ def corpus_mention_summary(corpus):
 
 ROOT = "../../../"
 OUTDIR = "/users/fries/desktop/dnorm/"
-CANDIDATE_DIR = "/Users/fries/workspace/dd-bio-examples/candidates/jason/diseases/v4/"
+CANDIDATE_DIR = "/Users/fries/debug/dd-bio-examples/candidates/jason/diseases/v4-oracle/"
 
 cache = "/Users/fries/Desktop/dnorm/cache3/"
 infile = "/Users/fries/Desktop/dnorm/disease_names/"
@@ -52,10 +51,13 @@ num_developent = len(Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,"d
 num_testing = len(Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,"testing")))
 
 
-cv = "testing"
+cv = "development"
 candidates = Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,cv))
 holdout = corpus.cv[cv].keys() 
 
+corpus.cv["development"].keys() 
+
+'''
 # -------------------------------------------------------
 # candidate recall
 print "CANDIDATE RECALL"
@@ -63,11 +65,15 @@ prediction = len(candidates) * [1]
 scores = corpus.score(candidates,prediction,holdout)
 print scores
 # -------------------------------------------------------
+'''
+#ROOT = "/Users/fries/debug/dd-bio-examples/candidates/jason/diseases/v4-oracle/"
 
-prediction = np.load("/Users/fries/workspace/dd-bio-examples/data/ncbi-{}-predictions.npy".format(cv))
-prediction = prediction[num_training:]
+#prediction = np.load("/users/fries/desktop/large-data-test.npy")
+prediction = np.load("/users/fries/desktop/ncbi-dev-predictions.npy")
+#prediction = [1] * len(candidates)
+#prediction = np.load("{}ncbi-{}-predictions.npy".format(ROOT,cv))
+#prediction = prediction[num_training:]
 gold_labels = corpus.gold_labels(candidates)
-
 
 '''
 # sklearn santity check (should match ddlite scores)
@@ -81,6 +87,6 @@ print "ddlite recall:   ", recall_score(gold_labels, prediction)
 
 #holdout = corpus.cv["training"].keys() 
 scores = corpus.score(candidates,prediction,holdout)
-print "Scores:",scores
+#print "Scores:",scores
 
 corpus.error_analysis(candidates,prediction,holdout)

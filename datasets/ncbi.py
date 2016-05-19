@@ -186,32 +186,35 @@ class NcbiDiseaseCorpus(Corpus):
             
         return candidate_idx
     
+    
+    def match(self, label, candidates, c_index=None, partial=True):
+        
+        m = []
+        c_index = self._candidate_index(candidates) if not c_index else c_index
+        
+        doc_id,sent_id,idxs,_,txt = label
+        if doc_id in c_index and sent_id in c_index[doc_id]:
+            lspan = (min(idxs),max(idxs)+1)
+            if lspan in c_index[doc_id][sent_id]:
+                m += [c_index[doc_id][sent_id][lspan]]
+                
+            if partial:
+                for cspan in c_index[doc_id][sent_id]:
+                    if overlaps(range(*lspan),range(*cspan)) and lspan!=cspan:
+                        m += [c_index[doc_id][sent_id][cspan]]
+                
+        return m
+    
     def error_analysis(self, candidates, prediction, doc_ids=None):
         
-        tp,fp,fn = self.classification_errors(candidates, prediction, doc_ids)
-        label_idx = self._label_index(doc_ids)
-        candidate_idx = self._candidate_index(candidates)
-            
-        # align FP and FN 
-        partial = {}
-        for i,label in enumerate(fn):
-            for j,candidate in enumerate(fp):
-                # already matches or not in the same document as label
-                if candidate in partial or (candidate[0] != label[0] or candidate[1] != label[1]):
-                    continue
-                
-                span1 = (min(label[2]),max(label[2])+1)
-                span2 = (min(candidate[2]),max(candidate[2])+1)
-                
-                if overlaps(range(*span1),range(*span2)):
-                    partial[candidate] = partial.get(candidate,[]) + [fn]
+        #label_idx = self._label_index(doc_ids)
+        c_index = self._candidate_index(candidates)
+        true_labels = set(self._ground_truth(doc_ids))
         
-        not_partial = {c:1 for c in candidates if c not in partial}
-        for x in not_partial:
-            print "ERROR", x.mention()
+        labels2candidates = {}
+        for label in true_labels:
+            labels2candidates[label] = self.match(label,candidates,c_index)
         
-        for x in partial:  
-            print x.mention(), len(partial[x])
         
     
     def error_analysis_old(self, candidates, prediction, doc_ids=None):
