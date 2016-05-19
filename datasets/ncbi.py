@@ -159,7 +159,62 @@ class NcbiDiseaseCorpus(Corpus):
         
         return (tp,fp,fn)
     
+    def _label_index(self,doc_ids):
+        '''Ground truth annotation index'''
+        label_idx = {}
+        for pmid in doc_ids:
+            label_idx[pmid] = {}
+            doc = self.__getitem__(pmid)
+            for sentence,tags in zip(doc["sentences"],doc["tags"]):
+                if sentence.sent_id not in label_idx[pmid]:
+                    label_idx[pmid][sentence.sent_id] = {}
+                for text,offset in tags:
+                    label_idx[pmid][sentence.sent_id][offset] = text
+        return label_idx
+    
+    
+    def _candidate_index(self,candidates):
+        
+        candidate_idx = {}
+        for i,c in enumerate(candidates):
+            if c.doc_id not in candidate_idx:
+                candidate_idx[c.doc_id] = {}
+            if c.sent_id not in candidate_idx[c.doc_id]:
+                candidate_idx[c.doc_id][c.sent_id] = {}
+            span = (min(c.idxs),max(c.idxs)+1)
+            candidate_idx[c.doc_id][c.sent_id][span] = c 
+            
+        return candidate_idx
+    
     def error_analysis(self, candidates, prediction, doc_ids=None):
+        
+        tp,fp,fn = self.classification_errors(candidates, prediction, doc_ids)
+        label_idx = self._label_index(doc_ids)
+        candidate_idx = self._candidate_index(candidates)
+            
+        # align FP and FN 
+        partial = {}
+        for i,label in enumerate(fn):
+            for j,candidate in enumerate(fp):
+                # already matches or not in the same document as label
+                if candidate in partial or (candidate[0] != label[0] or candidate[1] != label[1]):
+                    continue
+                
+                span1 = (min(label[2]),max(label[2])+1)
+                span2 = (min(candidate[2]),max(candidate[2])+1)
+                
+                if overlaps(range(*span1),range(*span2)):
+                    partial[candidate] = partial.get(candidate,[]) + [fn]
+        
+        not_partial = {c:1 for c in candidates if c not in partial}
+        for x in not_partial:
+            print "ERROR", x.mention()
+        
+        for x in partial:  
+            print x.mention(), len(partial[x])
+        
+    
+    def error_analysis_old(self, candidates, prediction, doc_ids=None):
         
         # candidate dictionary
         vocab = {" ".join(c.mention()) for c in candidates}

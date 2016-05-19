@@ -13,10 +13,8 @@ class PubMedAbstractCorpus(Corpus):
     def __init__(self, path, parser, cache_path=None):
         '''
         PubMed abstracts corpus. File format assumed to be
-        PMID title body
-        '''
+        PMID title body'''
         super(PubMedAbstractCorpus, self).__init__(path, parser)
-        
         self.documents = {}
         self._load_files()
         self.cache_path = cache_path
@@ -28,31 +26,32 @@ class PubMedAbstractCorpus(Corpus):
     def __getitem__(self,pmid):
         """Use PMID as key and load parsed document object"""
         pkl_file = "%s/%s.pkl" % (self.cache_path, pmid)
-        
         # load cached parse if it exists  
         if os.path.exists(pkl_file):
             with open(pkl_file, 'rb') as f:
-                self.documents[pmid] = cPickle.load(f)        
+                self.documents[pmid] = cPickle.load(f)
         else:
-            doc_str = "{} {}".format(self.documents[pmid]["title"],self.documents[pmid]["body"])
-            #title = [s for s in self.parser.parse(self.documents[pmid]["title"],doc_id=pmid)]
-            #body = [s for s in self.parser.parse(self.documents[pmid]["body"],doc_id=pmid)]
-            
+            doc_str = u"{} {}".format(self.documents[pmid]["title"],self.documents[pmid]["body"])
             sentences = [s for s in self.parser.parse(doc_str,doc_id=pmid)]
-            #sentences = title + body
             self.documents[pmid]["sentences"] = sentences
-            
             with open(pkl_file, 'w+') as f:
                 cPickle.dump(self.documents[pmid], f)
                
         return self.documents[pmid]
+    
+    def _clean(self,s):
+        # remove non-breaking spaces
+        s = re.sub(u'(\x00|\u00A0)',u' ',s).strip()
+        return s
         
+    
     def _load_files(self):
-        
-        docs = [d.strip().split("\t") for d in codecs.open(self.path,"r").readlines()]
+        docs = [self._clean(d.strip()).split("\t") for d in codecs.open(self.path,"rU",self.encoding).readlines()]
         docs = {pmid:{"title":title,"body":body,"pmid":pmid} for pmid,title,body in docs}
+        #docs = {"23878724":docs["23878724"]}
+        #print docs
         self.documents.update(docs)
-        
+       
         
         
 class PubMedCentralCorpus(Corpus):
@@ -89,11 +88,7 @@ class PubMedCentralCorpus(Corpus):
             document = self._parse_xml(uid)
             self._preprocess(document)
             with open(pkl_file, 'w+') as f:
-                cPickle.dump(document, f)   
-         
-            #for key in document:
-            #    print key, document[key]  
-                 
+                cPickle.dump(document, f)       
         else:
             document = self._parse_xml(uid)
             self._preprocess(document)

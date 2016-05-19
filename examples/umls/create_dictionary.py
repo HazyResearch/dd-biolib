@@ -3,9 +3,13 @@
 '''
 Simple UMLS Metathesaurus Dictionary Builder
 
-+ Build dictionaries of UMLS semantic types
+Build dictionaries of UMLS semantic types.
+See umls/docs for list of UMLS Semantic Types
 
-(See umls/docs for list of UMLS Semantic Types)
+Example usage:
+
+python create_dictionary.py -t "Disease or Syndrome" -s "SNOMEDCT_US" > outfile.txt
+
 '''
 from __future__ import print_function
 
@@ -56,7 +60,6 @@ def main(args):
         dictionary += map(norm.normalize,d)
         
     dictionary = {t:1 for t in dictionary}
-    
     print(len(dictionary), file=sys.stderr)
     
     # Use expanded 

@@ -69,7 +69,7 @@ prediction = prediction[num_training:]
 gold_labels = corpus.gold_labels(candidates)
 
 
-
+'''
 # sklearn santity check (should match ddlite scores)
 # -------------------------------------------------------
 gold_labels = [1 if x==1 else 0 for x in gold_labels]
@@ -77,7 +77,7 @@ prediction = [1 if x==1 else 0 for x in prediction]
 print "ddlite precision:", precision_score(gold_labels, prediction)
 print "ddlite recall:   ", recall_score(gold_labels, prediction)
 # -------------------------------------------------------
-
+'''
 
 #holdout = corpus.cv["training"].keys() 
 scores = corpus.score(candidates,prediction,holdout)
