@@ -51,11 +51,9 @@ num_developent = len(Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,"d
 num_testing = len(Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,"testing")))
 
 
-cv = "development"
-candidates = Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,cv))
-holdout = corpus.cv[cv].keys() 
+print num_training, num_developent
+#candidates/jason/diseases/{}/training-ncbi-candidates.pkl
 
-corpus.cv["development"].keys() 
 
 '''
 # -------------------------------------------------------
@@ -66,14 +64,18 @@ scores = corpus.score(candidates,prediction,holdout)
 print scores
 # -------------------------------------------------------
 '''
-#ROOT = "/Users/fries/debug/dd-bio-examples/candidates/jason/diseases/v4-oracle/"
 
-#prediction = np.load("/users/fries/desktop/large-data-test.npy")
+cv = "development"
+candidates = Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,cv))
+holdout = corpus.cv[cv].keys() 
+
 prediction = np.load("/users/fries/desktop/ncbi-dev-predictions.npy")
-#prediction = [1] * len(candidates)
-#prediction = np.load("{}ncbi-{}-predictions.npy".format(ROOT,cv))
-#prediction = prediction[num_training:]
+prediction = prediction[num_training:]
 gold_labels = corpus.gold_labels(candidates)
+
+#prediction = [1] * len(candidates)
+
+print len(candidates._candidates), len(prediction), len(gold_labels)
 
 '''
 # sklearn santity check (should match ddlite scores)
@@ -85,8 +87,11 @@ print "ddlite recall:   ", recall_score(gold_labels, prediction)
 # -------------------------------------------------------
 '''
 
-#holdout = corpus.cv["training"].keys() 
-scores = corpus.score(candidates,prediction,holdout)
-#print "Scores:",scores
 
+#scores = corpus.score(candidates,prediction,holdout)
+#print scores
 corpus.error_analysis(candidates,prediction,holdout)
+
+
+#774
+#TP:637 FP:137 FN:150 True_N:787

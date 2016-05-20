@@ -70,9 +70,10 @@ class NcbiDiseaseCorpus(Corpus):
                     span = tag[-1]
                     char_idx = doc[sent_id].token_idxs[span[0]]
                     char_span = tuple([char_idx, char_idx+len(label)])
-                    # match doc,sentence,char span and text (without tokenization)
-                    ground_truth += [(pmid, sent_id, tuple(range(*span)), char_span, label.replace(" ",""))] 
-                
+                    
+                    #ground_truth += [(pmid, sent_id, tuple(range(*span)), char_span, label.replace(" ",""))] 
+                    ground_truth += [(pmid, sent_id, tuple(range(*span)),label.replace(" ",""))] 
+                    
         return ground_truth
     
     def gold_labels(self,candidates):
@@ -85,8 +86,11 @@ class NcbiDiseaseCorpus(Corpus):
         for idx,c in enumerate(candidates):
             text = "".join([c.words[i] for i in c.idxs])
             char_span = [c.token_idxs[i] for i in c.idxs]
+            #char_span = tuple(char_span)
             char_span = (char_span[0], char_span[-1] + len(c.words[c.idxs[-1]]))
-            mention = (c.doc_id, c.sent_id, tuple(c.idxs), char_span, text)
+            #mention = (c.doc_id, c.sent_id, tuple(c.idxs), char_span, text)
+            mention = (c.doc_id, c.sent_id, tuple(c.idxs), text)
+            
             gold[idx] = 1 if mention in true_labels else -1
         
         return np.array(gold)
@@ -97,8 +101,12 @@ class NcbiDiseaseCorpus(Corpus):
         which aren't captured by ddlite metrics). If holdout (a list of 
         document PMIDs) is provided, us that as the document collection for scoring.
         '''
+        
+        print "Candidates N:{}".format(len(candidates))
         # create doc set from candidate pool or a provided doc_id set
         doc_ids = {c.doc_id:1 for c in candidates} if not doc_ids else dict.fromkeys(doc_ids)
+        
+        
         
         # compute original document character offsets for each mention
         mentions = {}
@@ -106,16 +114,13 @@ class NcbiDiseaseCorpus(Corpus):
             if c.doc_id not in doc_ids:
                 continue
             if prediction[i] != 1:
-                continue
-            
-            words = unescape_penn_treebank([c.words[i] for i in c.idxs])
-            char_span = [c.token_idxs[i] for i in c.idxs]
-            char_span = (char_span[0], char_span[-1] + len(c.words[c.idxs[-1]]))
-            entity = (c.doc_id, c.sent_id, tuple(c.idxs), char_span, "".join(words))    
-            mentions[entity] = mentions.get(entity,0) + 1
+                continue  
+            mentions[self.getkey(c)] = 1
         
         # score
         mentions = set(mentions.keys()) 
+        
+        
         true_labels = set(self._ground_truth(doc_ids))
         tp = true_labels.intersection(mentions)
         fp = mentions.difference(tp)
@@ -192,7 +197,8 @@ class NcbiDiseaseCorpus(Corpus):
         m = []
         c_index = self._candidate_index(candidates) if not c_index else c_index
         
-        doc_id,sent_id,idxs,_,txt = label
+        #doc_id,sent_id,idxs,_,_ = label
+        doc_id,sent_id,idxs,_ = label
         if doc_id in c_index and sent_id in c_index[doc_id]:
             lspan = (min(idxs),max(idxs)+1)
             if lspan in c_index[doc_id][sent_id]:
@@ -205,17 +211,85 @@ class NcbiDiseaseCorpus(Corpus):
                 
         return m
     
+    def getkey(self,c):
+        
+        txt = " ".join(c.mention())
+        char_span = [c.token_idxs[i] for i in c.idxs]
+        char_span = (min(char_span),min(char_span)+len(txt))
+        #return (c.doc_id, c.sent_id, tuple(c.idxs), char_span, "".join(c.mention()))
+        return (c.doc_id, c.sent_id, tuple(c.idxs), "".join(c.mention()))
+    
     def error_analysis(self, candidates, prediction, doc_ids=None):
         
-        #label_idx = self._label_index(doc_ids)
         c_index = self._candidate_index(candidates)
         true_labels = set(self._ground_truth(doc_ids))
         
-        labels2candidates = {}
+        
+        # positive pred mentions
+        mentions = {}
+        for i,c in enumerate(candidates):
+            if c.doc_id not in doc_ids:
+                continue
+            if prediction[i] != 1:
+                continue
+            mentions[self.getkey(c)] = c
+        
+        mentions = set(mentions.keys())
+        tp_set = true_labels.intersection(mentions)
+        fp_set = mentions.difference(tp_set)
+        fn_set = true_labels.difference(tp_set)
+        
+        print "DEBUG TP:{} FP:{} FN:{} True N:{}".format(len(tp_set),len(fp_set),len(fn_set),len(true_labels))
+        #--------------------------------------
+        
+        # NOTE: candidates can touch multiple labels
+        mapping,claimed = {},{}
         for label in true_labels:
-            labels2candidates[label] = self.match(label,candidates,c_index)
+            mapping[label] = self.match(label,candidates,c_index)
+            claimed.update({self.getkey(c):1 for c in mapping[label]})
+            
+        # total false positives (no partial match)
+        a = set([self.getkey(c) for c in candidates if self.getkey(c) not in claimed])
+        false_positives = a.difference(claimed.keys())
         
+        pred_idx = {self.getkey(c):prediction[i] for i,c in enumerate(candidates)}
         
+        tp,fp,fn = [],[],[]
+        for label in mapping:
+            
+            txt =  label[-1]
+            cands = ["".join(c.mention()) for c in mapping[label]]
+         
+            if txt in cands:       
+                c = mapping[label].pop(cands.index(txt))
+                key = self.getkey(c)
+                if pred_idx[key] == 1:
+                    tp += [self.getkey(c)]
+                else:
+                    fn += [self.getkey(c)]
+                
+                for c in mapping[label]:
+                    if pred_idx[key] == 1:
+                        fp += [self.getkey(c)]   
+            else:
+                for c in mapping[label]:
+                    if pred_idx[key] == 1:
+                        fp += [self.getkey(c)]
+                fn += [label]
+        
+        tp,fp,fn = set(tp),set(fp),set(fn)
+        
+        print "FP",len(fp_set.difference(fp))
+        print fp_set.difference(fp)
+        
+        print "TP",len(tp_set.difference(tp))
+        print tp_set.difference(tp)
+        
+        print "-----------------------------"
+        print "TP:{} FP:{} FN:{} True_N:{}".format(len(tp),len(fp),len(fn),len(true_labels))
+        print "-----------------------------"
+
+    
     
     def error_analysis_old(self, candidates, prediction, doc_ids=None):
         
