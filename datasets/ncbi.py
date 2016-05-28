@@ -71,8 +71,8 @@ class NcbiDiseaseCorpus(Corpus):
                     char_idx = doc[sent_id].token_idxs[span[0]]
                     char_span = tuple([char_idx, char_idx+len(label)])
                     
-                    #ground_truth += [(pmid, sent_id, tuple(range(*span)), char_span, label.replace(" ",""))] 
-                    ground_truth += [(pmid, sent_id, tuple(range(*span)),label.replace(" ",""))] 
+                    ground_truth += [(pmid, sent_id, tuple(range(*span)), char_span, label.replace(" ",""))]
+                    #ground_truth += [(pmid, sent_id, tuple(range(*span)),label.replace(" ",""))]
                     
         return ground_truth
     
@@ -106,8 +106,6 @@ class NcbiDiseaseCorpus(Corpus):
         # create doc set from candidate pool or a provided doc_id set
         doc_ids = {c.doc_id:1 for c in candidates} if not doc_ids else dict.fromkeys(doc_ids)
         
-        
-        
         # compute original document character offsets for each mention
         mentions = {}
         for i,c in enumerate(candidates):
@@ -118,9 +116,7 @@ class NcbiDiseaseCorpus(Corpus):
             mentions[self.getkey(c)] = 1
         
         # score
-        mentions = set(mentions.keys()) 
-        
-        
+        mentions = set(mentions.keys())
         true_labels = set(self._ground_truth(doc_ids))
         tp = true_labels.intersection(mentions)
         fp = mentions.difference(tp)
@@ -142,6 +138,7 @@ class NcbiDiseaseCorpus(Corpus):
     def classification_errors(self, candidates, prediction, doc_ids=None):
         # create doc set from candidate pool or a provided doc_id set
         doc_ids = {c.doc_id:1 for c in candidates} if not doc_ids else dict.fromkeys(doc_ids)
+        
         # compute original document character offsets for each mention
         mentions = {}
         for i,c in enumerate(candidates):
@@ -149,13 +146,9 @@ class NcbiDiseaseCorpus(Corpus):
                 continue
             if prediction[i] != 1:
                 continue
-            
-            words = unescape_penn_treebank([c.words[i] for i in c.idxs])
-            char_span = [c.token_idxs[i] for i in c.idxs]
-            char_span = (char_span[0], char_span[-1] + len(c.words[c.idxs[-1]]))
-            entity = (c.doc_id, c.sent_id, tuple(c.idxs), char_span, "".join(words))    
-            mentions[entity] = mentions.get(entity,0) + 1
-            
+            mentions[self.getkey(c)] = 1
+    
+        #score
         mentions = set(mentions.keys()) 
         true_labels = set(self._ground_truth(doc_ids))
         tp = true_labels.intersection(mentions)
@@ -197,8 +190,8 @@ class NcbiDiseaseCorpus(Corpus):
         m = []
         c_index = self._candidate_index(candidates) if not c_index else c_index
         
-        #doc_id,sent_id,idxs,_,_ = label
-        doc_id,sent_id,idxs,_ = label
+        doc_id,sent_id,idxs,_,_ = label
+        #doc_id,sent_id,idxs,_ = label
         if doc_id in c_index and sent_id in c_index[doc_id]:
             lspan = (min(idxs),max(idxs)+1)
             if lspan in c_index[doc_id][sent_id]:
@@ -216,172 +209,54 @@ class NcbiDiseaseCorpus(Corpus):
         txt = " ".join(c.mention())
         char_span = [c.token_idxs[i] for i in c.idxs]
         char_span = (min(char_span),min(char_span)+len(txt))
-        #return (c.doc_id, c.sent_id, tuple(c.idxs), char_span, "".join(c.mention()))
-        return (c.doc_id, c.sent_id, tuple(c.idxs), "".join(c.mention()))
+        return (c.doc_id, c.sent_id, tuple(c.idxs), char_span, "".join(c.mention()))
+        #return (c.doc_id, c.sent_id, tuple(c.idxs), "".join(c.mention()))
+    
+    def force_longest_match(self, candidates, probability, doc_ids=None):
+        '''Only use longest correct match for any set of overlapping or 
+        adjoining mentions'''
+    
+        c_index = self._candidate_index(candidates)
+        true_labels = set(self._ground_truth(doc_ids))
+        pred_idx = {self.getkey(c):i for i,c in enumerate(candidates)}
+        
+        mapping = {}
+        for label in true_labels:
+            mapping[label] = self.match(label,candidates,c_index)
+            
+        for label in mapping:
+            lengths = [len(c.mention()) for c in mapping[label]]
+            proba = [probability[pred_idx[self.getkey(c)]] for c in mapping[label]]
+            scores = zip(proba,lengths,mapping[label])
+            print [(x,y,z.mention()) for (x,y,z) in sorted(scores,reverse=1)]
+            #scores = [c for _,c,p in sorted(zip(lengths,mapping[label],proba),reverse=1) if p > 0.5]
+            scores = [c for p,l,c, in sorted(zip(proba,lengths,mapping[label]),reverse=1) if p > 0.499]
+            
+            if not scores:
+                continue
+            
+            mapping[label].remove(scores[0])
+            
+            probability[pred_idx[self.getkey(scores[0])]] = 1
+            
+            for c in mapping[label]:
+                probability[pred_idx[self.getkey(c)]] = -1
+
     
     def error_analysis(self, candidates, prediction, doc_ids=None):
         
         c_index = self._candidate_index(candidates)
         true_labels = set(self._ground_truth(doc_ids))
         
-        
-        # positive pred mentions
-        mentions = {}
-        for i,c in enumerate(candidates):
-            if c.doc_id not in doc_ids:
-                continue
-            if prediction[i] != 1:
-                continue
-            mentions[self.getkey(c)] = c
-        
-        mentions = set(mentions.keys())
-        tp_set = true_labels.intersection(mentions)
-        fp_set = mentions.difference(tp_set)
-        fn_set = true_labels.difference(tp_set)
-        
-        print "DEBUG TP:{} FP:{} FN:{} True N:{}".format(len(tp_set),len(fp_set),len(fn_set),len(true_labels))
-        #--------------------------------------
-        
-        # NOTE: candidates can touch multiple labels
         mapping,claimed = {},{}
         for label in true_labels:
+            # NOTE: candidates can touch multiple labels
             mapping[label] = self.match(label,candidates,c_index)
             claimed.update({self.getkey(c):1 for c in mapping[label]})
-            
-        # total false positives (no partial match)
-        a = set([self.getkey(c) for c in candidates if self.getkey(c) not in claimed])
-        false_positives = a.difference(claimed.keys())
         
-        pred_idx = {self.getkey(c):prediction[i] for i,c in enumerate(candidates)}
-        
-        tp,fp,fn = [],[],[]
-        for label in mapping:
-            
-            txt =  label[-1]
-            cands = ["".join(c.mention()) for c in mapping[label]]
-         
-            if txt in cands:       
-                c = mapping[label].pop(cands.index(txt))
-                key = self.getkey(c)
-                if pred_idx[key] == 1:
-                    tp += [self.getkey(c)]
-                else:
-                    fn += [self.getkey(c)]
-                
-                for c in mapping[label]:
-                    if pred_idx[key] == 1:
-                        fp += [self.getkey(c)]   
-            else:
-                for c in mapping[label]:
-                    if pred_idx[key] == 1:
-                        fp += [self.getkey(c)]
-                fn += [label]
-        
-        tp,fp,fn = set(tp),set(fp),set(fn)
-        
-        print "FP",len(fp_set.difference(fp))
-        print fp_set.difference(fp)
-        
-        print "TP",len(tp_set.difference(tp))
-        print tp_set.difference(tp)
-        
-        print "-----------------------------"
-        print "TP:{} FP:{} FN:{} True_N:{}".format(len(tp),len(fp),len(fn),len(true_labels))
-        print "-----------------------------"
-
-    
-    
-    def error_analysis_old(self, candidates, prediction, doc_ids=None):
-        
-        # candidate dictionary
-        vocab = {" ".join(c.mention()) for c in candidates}
-        tp,fp,fn = self.classification_errors(candidates, prediction, doc_ids)
-        
-        # ground truth annotation index
-        label_idx = {}
-        for pmid in doc_ids:
-            label_idx[pmid] = {}
-            doc = self.__getitem__(pmid)
-            for sentence,tags in zip(doc["sentences"],doc["tags"]):
-                if sentence.sent_id not in label_idx[pmid]:
-                    label_idx[pmid][sentence.sent_id] = {}
-                for text,offset in tags:
-                    label_idx[pmid][sentence.sent_id][offset] = text
+        #pred_idx = {self.getkey(c):prediction[i] for i,c in enumerate(candidates)}
         
         
-        # candidate index
-        candidate_idx = {}
-        for i,c in enumerate(candidates):
-            if c.doc_id not in candidate_idx:
-                candidate_idx[c.doc_id] = {}
-            if c.sent_id not in candidate_idx[c.doc_id]:
-                candidate_idx[c.doc_id][c.sent_id] = {}
-            span = (min(c.idxs),max(c.idxs)+1)
-            candidate_idx[c.doc_id][c.sent_id][span] = c 
-        
-        
-        #
-        # False positives
-        #
-        partial_matches = {}
-        for i,c in enumerate(fp):
-            doc_id,sent_id,offset,char_offset,text = c
-            offset = list(offset) 
-            offset = tuple([min(offset), max(offset) + 1])
-            
-            # look for subsequence matches
-            if doc_id in label_idx and sent_id in label_idx[doc_id]:
-                for span in label_idx[doc_id][sent_id]:
-                    if overlaps(range(*span),range(*offset)):
-                        partial_matches[c] = 1
-            
-        no_matches = [c for c in fp if c not in partial_matches]
-        
-        # full false positives
-        for ckey in no_matches:
-            doc_id,sent_id,idxs,char_span,text = ckey
-            candidate = candidate_idx[doc_id][sent_id][(min(idxs),max(idxs)+1)]
-            print "Complete FP", " ".join(candidate.words[min(idxs):max(idxs)+1])
-            
-        print "FP:{} partial matches {} {:.2f}%".format(len(fp), len(partial_matches),
-                                                      len(partial_matches)/float(len(fp))*100)
-        
-        # False Negatives
-        # find false negatives with *no* partial match
-        tagged,claimed = {},{}
-        for i,label in enumerate(fn):
-            tagged[label] = []
-            for j,candidate in enumerate(partial_matches):
-                if candidate[0] != label[0] or candidate[1] != label[1]:
-                    continue
-                if candidate in claimed:
-                    continue
-                
-                span1 = (min(label[2]),max(label[2])+1)
-                span2 = (min(candidate[2]),max(candidate[2])+1)
-                
-                if overlaps(range(*span1),range(*span2)):
-                    tagged[label] += [candidate]
-                    claimed[candidate] = 1
-          
-        n,num_oov,num_inv = 0,0,0     
-        for label in tagged:
-            doc_id,sent_id,offset,char_offset,text = label
-            
-            if len(tagged[label]) == 0:
-                oov = text in vocab
-                if not oov:
-                    num_oov += 1
-                else:
-                    num_inv += 1
-            else:
-                n += 1
-        
-        print "FN:{} partial matches   {} {:.2f}%".format(len(fn), n, float(n)/len(fn)*100)
-        print "      out-of-vocabulary {} {:.2f}%".format(num_oov, float(num_oov)/len(fn)*100)
-        print "      in-vocabulary     {} {:.2f}%".format(num_inv, float(num_inv)/len(fn)*100)
-        
-    
     def conll(self,doc_ids):
         '''Export docs to CoNLL format'''
         
@@ -503,11 +378,7 @@ class NcbiDiseaseCorpus(Corpus):
             # validate there are no duplicate annotations
             labels = [ map(lambda x:(pmid,x), self.annotations[pmid]) for pmid in self.cv[setname]]
             labels = list(itertools.chain.from_iterable(labels))
-            #if len(labels) != len(set(labels)):
-            #    print "Warning: duplicate annotations found"
-            #    freq = {l:labels.count(l) for l in labels}
-            #    freq = {l:n for l,n in freq.items() if n != 1}
-                
+      
             print setname,len(labels)
         
             

@@ -21,7 +21,6 @@ def find_duplicates(candidates):
                 print b.doc_id, b.sent_id, b.mention()
                 print
            
-
 def corpus_mention_summary(corpus):
     '''The raw corpus doesn't match the statistics provided at
     http://www.ncbi.nlm.nih.gov/CBBresearch/Dogan/DISEASE/corpus.html
@@ -38,7 +37,8 @@ def corpus_mention_summary(corpus):
 
 ROOT = "../../../"
 OUTDIR = "/users/fries/desktop/dnorm/"
-CANDIDATE_DIR = "/Users/fries/debug/dd-bio-examples/candidates/jason/diseases/v4-oracle/"
+#CANDIDATE_DIR = "/Users/fries/debug/dd-bio-examples/candidates/jason/diseases/v4-oracle/"
+CANDIDATE_DIR = "/Users/fries/debug/dd-bio-examples/candidates/jason/diseases/v4-subsequences/"
 
 cache = "/Users/fries/Desktop/dnorm/cache3/"
 infile = "/Users/fries/Desktop/dnorm/disease_names/"
@@ -70,12 +70,17 @@ candidates = Entities("{}{}-ncbi-candidates.pkl".format(CANDIDATE_DIR,cv))
 holdout = corpus.cv[cv].keys() 
 
 prediction = np.load("/users/fries/desktop/ncbi-dev-predictions.npy")
+probability = np.load("/users/fries/desktop/ncbi-dev-probability.npy")
+#prediction = np.load("/users/fries/desktop/ncbi-test-predictions.npy")
+
 prediction = prediction[num_training:]
+#prediction = prediction[num_training+num_developent:]
+
 gold_labels = corpus.gold_labels(candidates)
 
 #prediction = [1] * len(candidates)
 
-print len(candidates._candidates), len(prediction), len(gold_labels)
+#print len(candidates._candidates), len(prediction), len(gold_labels)
 
 '''
 # sklearn santity check (should match ddlite scores)
@@ -88,10 +93,12 @@ print "ddlite recall:   ", recall_score(gold_labels, prediction)
 '''
 
 
-#scores = corpus.score(candidates,prediction,holdout)
-#print scores
-corpus.error_analysis(candidates,prediction,holdout)
+scores = corpus.score(candidates,prediction,holdout)
+print scores
+#corpus.error_analysis(candidates,prediction,holdout)
+corpus.force_longest_match(candidates,probability,holdout)
 
-
+scores = corpus.score(candidates,probability,holdout)
+print scores
 #774
 #TP:637 FP:137 FN:150 True_N:787

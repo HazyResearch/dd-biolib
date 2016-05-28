@@ -21,6 +21,10 @@ meta = ontologies.umls.Metathesaurus()
 cui1 = "C0016129" # finger
 cui2 = "C0446516" # arm
 
+cui1 = "C0028643" # numbness
+cui2 = "C0030193" # pain
+cui2 = "C0085624" # burning
+
 #cui1 = "C0546866"  # Gentamicin Sulfate (USP) C0017436
 #cui2 = "C0035204"  # Respiration Disorders
 
