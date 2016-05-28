@@ -123,7 +123,6 @@ class NcbiDiseaseCorpus(Corpus):
         fn = true_labels.difference(tp)
         
         print "-----------------------------"
-        print len(mentions)
         print "TP:{} FP:{} FN:{} True_N:{}".format(len(tp),len(fp),len(fn),len(true_labels))
         print "-----------------------------"
         
@@ -205,7 +204,6 @@ class NcbiDiseaseCorpus(Corpus):
         return m
     
     def getkey(self,c):
-        
         txt = " ".join(c.mention())
         char_span = [c.token_idxs[i] for i in c.idxs]
         char_span = (min(char_span),min(char_span)+len(txt))
@@ -236,14 +234,13 @@ class NcbiDiseaseCorpus(Corpus):
                 continue
             
             mapping[label].remove(scores[0])
-            
             probability[pred_idx[self.getkey(scores[0])]] = 1
             
             for c in mapping[label]:
                 probability[pred_idx[self.getkey(c)]] = -1
 
     
-    def error_analysis(self, candidates, prediction, doc_ids=None):
+    def error_analysis_v1(self, candidates, prediction, doc_ids=None):
         
         c_index = self._candidate_index(candidates)
         true_labels = set(self._ground_truth(doc_ids))
@@ -255,6 +252,56 @@ class NcbiDiseaseCorpus(Corpus):
             claimed.update({self.getkey(c):1 for c in mapping[label]})
         
         #pred_idx = {self.getkey(c):prediction[i] for i,c in enumerate(candidates)}
+
+
+    def error_analysis(self, candidates, prediction, doc_ids=None):
+        
+        c_index = self._candidate_index(candidates)
+        l_index = self._label_index(doc_ids)
+        true_labels = set(self._ground_truth(doc_ids))
+        
+        mapping,claimed = {},{}
+        for label in true_labels:
+            # NOTE: candidates can touch multiple labels
+            mapping[label] = self.match(label,candidates,c_index)
+            claimed.update({self.getkey(c):1 for c in mapping[label]})     
+        
+        partial,complete = [],[]
+        for label in true_labels:
+            matches = self.match(label, candidates, c_index)
+            mentions = [" ".join(c.mention()) for c in mapping[label]]
+            
+            # true label
+            doc_id,sent_id,idxs,char_span,_ = label
+            span = (min(idxs),max(idxs)+1)
+            mtext = l_index[doc_id][sent_id][span]
+            
+            # partial match
+            if mtext not in mentions and len(matches) != 0:
+                partial += [list(label)[0:-1] + [mtext]]
+            
+            # missed entirely
+            elif mtext not in mentions:
+                complete += [list(label)[0:-1] + [mtext]]
+        
+        return (partial,complete)
+        '''
+        print "-----------------------------------"
+        print "FN: Partial Matches"
+        print "-----------------------------------"
+        print len(partial)
+        for item in partial:
+            print item
+        
+        print "-----------------------------------"
+        print "FN: Complete Misses"
+        print "-----------------------------------"
+        print len(complete)
+        for item in complete:
+            print item
+        '''
+        
+        
         
         
     def conll(self,doc_ids):
