@@ -7,6 +7,7 @@ import cPickle
 from collections import namedtuple
 from .base import *
 from .tools import unescape_penn_treebank
+from collections import defaultdict
 
 class PubMedAbstractCorpus(Corpus):
     
@@ -84,14 +85,17 @@ class PubMedCentralCorpus(Corpus):
             with open(pkl_file, 'rb') as f:
                 document = cPickle.load(f)
            
-        elif pkl_file:
+        elif pkl_file and self.parser:
             document = self._parse_xml(uid)
             self._preprocess(document)
             with open(pkl_file, 'w+') as f:
-                cPickle.dump(document, f)       
-        else:
+                cPickle.dump(document, f)     
+                  
+        elif self.parser:
             document = self._parse_xml(uid)
             self._preprocess(document)
+        else:
+            document = self._parse_xml(uid)
         
         return document    
         
@@ -222,7 +226,26 @@ class PubMedCentralCorpus(Corpus):
             document["section-titles"] += [self.tounicode(title)]
             document["section-text"] += [self.tounicode(content)]
         
-
+        #
+        # References
+        #
+        references = doc.xpath("//article/back/ref-list/ref")
+        document["references"] = []
+        for ref in references:
+            refdict = {}
+           
+            for node in ref.iter('*'):
+                if node.tag in ["given-names","name","mixed-citation"]:
+                    continue
+                
+                value = node.text
+                pub_id_type = node.get("pub-id-type")
+                if pub_id_type:
+                    value = (pub_id_type,node.text)
+                   
+                refdict[node.tag] = refdict.get(node.tag,[]) + [value]
+            document["references"] += [refdict]
+        
         return document
        
     def _load_files(self):
