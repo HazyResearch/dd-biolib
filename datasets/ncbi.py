@@ -85,11 +85,13 @@ class NcbiDiseaseCorpus(Corpus):
         gold = [0] * len(candidates)
         for idx,c in enumerate(candidates):
             text = "".join([c.words[i] for i in c.idxs])
+            
             char_span = [c.token_idxs[i] for i in c.idxs]
-            #char_span = tuple(char_span)
             char_span = (char_span[0], char_span[-1] + len(c.words[c.idxs[-1]]))
-            #mention = (c.doc_id, c.sent_id, tuple(c.idxs), char_span, text)
-            mention = (c.doc_id, c.sent_id, tuple(c.idxs), text)
+            char_span = tuple(char_span)
+            
+            mention = (c.doc_id, c.sent_id, tuple(c.idxs), char_span, text)
+            #mention = (c.doc_id, c.sent_id, tuple(c.idxs), text)
             
             gold[idx] = 1 if mention in true_labels else -1
         
