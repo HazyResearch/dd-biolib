@@ -7,6 +7,7 @@ import operator
 import itertools
 import numpy as np
 from .base import *
+from ddlite import SentenceParser
 from .tools import unescape_penn_treebank,overlaps
 
 class CdrCorpus(Corpus):
@@ -17,12 +18,15 @@ class CdrCorpus(Corpus):
         X disease mentions
         X chemical mentions
     '''
-    def __init__(self, path, parser, cache_path="/tmp/"):
+    def __init__(self, path, parser=SentenceParser(), cache_path="/tmp/"):
         super(CdrCorpus, self).__init__(path, parser)
         self.path = path
         self.cv = {"training":{},"development":{},"testing":{}}
         self.documents = {}
         self.annotations = {}
+        # hack
+        self.relations = {}
+        self.entities = {}
      
         self._load_files()
         self.cache_path = cache_path
@@ -49,7 +53,9 @@ class CdrCorpus(Corpus):
                 self.documents[pmid]["tags"] = self._label(self.annotations[pmid],self.documents[pmid]["sentences"])
             else:
                 self.documents[pmid]["tags"] += [[] for _ in range(len(self.documents[pmid]["sentences"]))]   
-                
+             
+            self.documents[pmid]["relations"] = self.relations[pmid]
+              
             with open(pkl_file, 'w+') as f:
                 cPickle.dump(self.documents[pmid], f)
         
@@ -352,8 +358,9 @@ class CdrCorpus(Corpus):
                             s_end = j + 1
                         else:
                             break
-                            
-                    tags[i] += [ (label.text, (s_start,s_end)) ]
+                    
+                    uids = tuple(label.mesh_ids)
+                    tags[i] += [ (label.text, (s_start,s_end), label.mention_type, uids) ]
                     
         return tags           
 
@@ -369,15 +376,12 @@ class CdrCorpus(Corpus):
                   "CDR_TrainingSet.PubTator.txt":"training"}
         
         filelist = glob.glob("%s/*.txt" % self.path)
-        
         for fname in filelist:
-           
             setname = cvdefs[fname.split("/")[-1]]
             documents = []
             with codecs.open(fname,"rU",self.encoding) as f:
                 doc = []
                 for line in f:
-                    
                     row = line.strip()
                     if not row and doc:
                         documents += [doc]
@@ -385,7 +389,6 @@ class CdrCorpus(Corpus):
                     elif row:
                         row = row.split("|") if (len(row.split("|")) > 1 and row.split("|")[1] in ["t","a"]) else row.split("\t")
                         doc += [row]
-                        
                 if doc:
                     documents += [doc]
             
@@ -401,9 +404,16 @@ class CdrCorpus(Corpus):
                 doc_str = "%s %s" % (title, body)
               
                 for row in doc[2:]:
-                    if len(row) <= 4 or row[4] == "Chemical":
+                    
+                    # relation
+                    # ----------------------------
+                    if len(row) <= 4:# or row[4] == "Chemical":
+                        pmid,rela,m1,m2 = row
+                        self.relations[pmid] = self.relations.get(pmid,[]) + [(m1,m2)]
                         continue
                     
+                    # entity
+                    # ----------------------------
                     if len(row) == 6:
                         pmid, start, end, text, mention_type, duid = row
                         norm_names = []
@@ -418,9 +428,14 @@ class CdrCorpus(Corpus):
                     if pmid not in self.annotations:
                         self.annotations[pmid] = []
                     
-                    label = CdrAnnotation(text_type, start, end, text, mention_type, duid, norm_names)
+                    label = CdrEntity(text_type, start, end, text, mention_type, duid, norm_names)
+                    
                     self.annotations[pmid] += [label]
-            
+                
+                # create entity 
+                for label in self.annotations[pmid]:
+                    print "ADD TO MAPPING"
+                
             # validate there are no duplicate annotations
             labels = [ map(lambda x:(pmid,x), self.annotations[pmid]) for pmid in self.cv[setname]]
             labels = list(itertools.chain.from_iterable(labels))

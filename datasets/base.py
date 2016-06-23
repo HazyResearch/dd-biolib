@@ -5,7 +5,10 @@ import codecs
 from collections import namedtuple
 
 Annotation = namedtuple('Annotation', ['text_type','start','end','text','mention_type'])
-CdrAnnotation = namedtuple('Annotation', ['text_type','start','end','text','mention_type', "mesh_ids", "mesh_names"])
+#CdrAnnotation = namedtuple('Annotation', ['text_type','start','end','text','mention_type', "mesh_ids", "mesh_names"])
+
+CdrEntity = namedtuple('CdrEntity', ['text_type','start','end','text','mention_type', "mesh_ids", "mesh_names"])
+
 Document = namedtuple('Document',['doc_id','title','body','sentences'])
 
 class Corpus(object):
