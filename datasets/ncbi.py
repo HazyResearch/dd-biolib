@@ -44,8 +44,13 @@ class NcbiDiseaseCorpus(Corpus):
             title = self.documents[pmid]["title"]
             body = self.documents[pmid]["body"]
             doc_str = "%s %s" % (title,body)
-            self.documents[pmid]["sentences"] = [s for s in self.parser.parse(doc_str,doc_id=pmid)]
-            
+            try:
+                self.documents[pmid]["sentences"] = [s for s in self.parser.parse(doc_str,doc_id=pmid)]
+            except:
+                print "Parse Error"
+                print doc_str
+                self.documents[pmid]["sentences"] = []
+                
             self.documents[pmid]["tags"] = []
             if pmid in self.annotations:
                 self.documents[pmid]["tags"] = self._label(self.annotations[pmid],self.documents[pmid]["sentences"])

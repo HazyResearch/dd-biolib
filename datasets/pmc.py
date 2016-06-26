@@ -5,9 +5,9 @@ import lxml
 import codecs
 import cPickle
 from collections import namedtuple
+from collections import defaultdict
 from .base import *
 from .tools import unescape_penn_treebank
-from collections import defaultdict
 
 class PubMedAbstractCorpus(Corpus):
     
@@ -102,10 +102,14 @@ class PubMedCentralCorpus(Corpus):
     def _preprocess(self,document):  
         '''Parse documents'''
         # determine unique doc ID
-        if "pmid" in document["metadata"]:
-            doc_id = "PMID:{}".format(document["metadata"]["pmid"])
+        if "pmc-uid" in document["metadata"]:
+            doc_id = "PMC{}".format(document["metadata"]["pmc-uid"])
+        elif "pmcid" in document["metadata"]:
+            doc_id = document["metadata"]["pmcid"]
         elif "pmc" in document["metadata"]:
-            doc_id = "PMC:{}".format(document["metadata"]["pmc"]) 
+            doc_id = "PMC{}".format(document["metadata"]["pmc"]) 
+        elif "pmid" in document["metadata"]:
+            doc_id = "PMID{}".format(document["metadata"]["pmid"])
         else:
             # just use a hashed journal title
             doc_id = "{}".format(hash(document["metadata"]["journal-title"])/1000000000)
@@ -140,7 +144,19 @@ class PubMedCentralCorpus(Corpus):
         s = s.encode("utf-8","ignore").decode("ascii","ignore")
         s = s.rstrip(' \t\r\n\0').strip('\0')
         return s
-        
+    
+    
+    def _strip_ns(self,tree):
+        #http://stackoverflow.com/questions/30232031/how-can-i-strip-namespaces-out-of-an-lxml-tree
+        for node in tree.iter():
+            try:
+                has_namespace = node.tag.startswith('{')
+            except AttributeError:
+                continue  # node.tag is not a string (node is a comment or similar)
+            if has_namespace:
+                node.tag = node.tag.split('}', 1)[1]
+                
+    
     def _parse_xml(self,uid):
         '''Parse PMC XML format, pull out relevant metadata. 
         NOTE: lxml + unicode is a major pain.
@@ -148,6 +164,9 @@ class PubMedCentralCorpus(Corpus):
         #
         doc = lxml.etree.parse(uid)
         document = {"section-text":[],"section-titles":[],"metadata":{}}
+       
+        # strip namespaces
+        self._strip_ns(doc)
         
         #
         # Article metadata is more complicated -- we just pull out a small subset
@@ -157,8 +176,7 @@ class PubMedCentralCorpus(Corpus):
             for node in root[0].iter('*'):
                 if len(node) == 0:
                     document["metadata"][node.tag] = self.tounicode(node.text)
-                    
-    
+        
         root = doc.xpath("//article/front/article-meta")
         if root:
             article_ids = doc.xpath("//article/front/article-meta/article-id")
@@ -233,7 +251,6 @@ class PubMedCentralCorpus(Corpus):
         document["references"] = []
         for ref in references:
             refdict = {}
-           
             for node in ref.iter('*'):
                 if node.tag in ["given-names","name","mixed-citation"]:
                     continue
@@ -249,5 +266,11 @@ class PubMedCentralCorpus(Corpus):
         return document
        
     def _load_files(self):
-        self.documents = {fname:0 for fname in glob.glob("%s/*/*.nxml" % self.path)}
+        
+        #self.documents = {fname:0 for fname in glob.glob("%s/*/*.nxml" % self.path)}
+        for root, _, filenames in os.walk(self.path):
+            for filename in [x for x in filenames if re.search(".xml$",x)]:
+                fname = os.path.join(root, filename)
+                self.documents[fname] = 0
+        
           
