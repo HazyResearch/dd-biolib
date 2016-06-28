@@ -48,11 +48,15 @@ class CdrCorpus(Corpus):
             doc_str = "%s %s" % (title,body)
             self.documents[pmid]["sentences"] = [s for s in self.parser.parse(doc_str,doc_id=pmid)]
             
-            self.documents[pmid]["tags"] = []
+            self.documents[pmid]["tags"] = {}
             if pmid in self.annotations:
-                self.documents[pmid]["tags"] = self._label(self.annotations[pmid],self.documents[pmid]["sentences"])
+                diseases = [i for i in self.annotations[pmid] if i.mention_type=="Disease"]  
+                chemicals = [i for i in self.annotations[pmid] if i.mention_type=="Chemical"]  
+                self.documents[pmid]["tags"]["diseases"] = self._label(diseases,self.documents[pmid]["sentences"])
+                self.documents[pmid]["tags"]["chemicals"] = self._label(chemicals,self.documents[pmid]["sentences"])
             else:
-                self.documents[pmid]["tags"] += [[] for _ in range(len(self.documents[pmid]["sentences"]))]   
+                self.documents[pmid]["tags"]["diseases"] += [[] for _ in range(len(self.documents[pmid]["sentences"]))]  
+                self.documents[pmid]["tags"]["chemicals"] += [[] for _ in range(len(self.documents[pmid]["sentences"]))]   
              
             self.documents[pmid]["relations"] = self.relations[pmid]
               
@@ -61,17 +65,18 @@ class CdrCorpus(Corpus):
         
         return self.documents[pmid]
     
-    def _ground_truth(self,doc_ids):
+    def _ground_truth(self,doc_ids,entity_type="chemicals"):
         '''Build ground truth (doc_id,sent_id,char_offset) mentions'''
         ground_truth = []
         for pmid in doc_ids:
             doc = self.__getitem__(pmid)["sentences"]
-            labels = self.__getitem__(pmid)["tags"]
+            labels = self.__getitem__(pmid)["tags"][entity_type]
+            #print len(labels), labels
             for sent_id in range(0,len(doc)):
                 for tag in labels[sent_id]:
                     # assess ground truth on token
                     label = tag[0] # gold standard annotation text
-                    span = tag[-1]
+                    span = tag[1]
                     char_idx = doc[sent_id].token_idxs[span[0]]
                     char_span = tuple([char_idx, char_idx+len(label)])
                     
@@ -80,11 +85,11 @@ class CdrCorpus(Corpus):
                     
         return ground_truth
     
-    def gold_labels(self,candidates):
+    def gold_labels(self,candidates,entity_type):
         '''Given a set of candidates, generate -1,1 labels 
         using internal gold label data'''
         doc_ids = {c.doc_id:1 for c in candidates} 
-        true_labels = set(self._ground_truth(doc_ids))
+        true_labels = set(self._ground_truth(doc_ids,entity_type))
         
         gold = [0] * len(candidates)
         for idx,c in enumerate(candidates):
@@ -101,7 +106,7 @@ class CdrCorpus(Corpus):
         
         return np.array(gold)
     
-    def score(self, candidates, prediction, doc_ids=None):
+    def score(self, candidates, prediction, entity_type="chemicals", doc_ids=None):
         '''Given a set of candidates, compute true precision, recall, f1
         using gold labeled benchmark data (this includes non-candidate entities,
         which aren't captured by ddlite metrics). If holdout (a list of 
@@ -123,7 +128,7 @@ class CdrCorpus(Corpus):
         
         # score
         mentions = set(mentions.keys())
-        true_labels = set(self._ground_truth(doc_ids))
+        true_labels = set(self._ground_truth(doc_ids,entity_type))
         tp = true_labels.intersection(mentions)
         fp = mentions.difference(tp)
         fn = true_labels.difference(tp)
@@ -140,7 +145,7 @@ class CdrCorpus(Corpus):
                 "tp":len(tp), "fp":len(fp), "fn":len(fn)}
         
 
-    def classification_errors(self, candidates, prediction, doc_ids=None):
+    def classification_errors(self, candidates, prediction, entity_type="chemicals", doc_ids=None):
         # create doc set from candidate pool or a provided doc_id set
         doc_ids = {c.doc_id:1 for c in candidates} if not doc_ids else dict.fromkeys(doc_ids)
         
@@ -155,20 +160,20 @@ class CdrCorpus(Corpus):
     
         #score
         mentions = set(mentions.keys()) 
-        true_labels = set(self._ground_truth(doc_ids))
+        true_labels = set(self._ground_truth(doc_ids,entity_type))
         tp = true_labels.intersection(mentions)
         fp = mentions.difference(tp)
         fn = true_labels.difference(tp)
         
         return (tp,fp,fn)
     
-    def _label_index(self,doc_ids):
+    def _label_index(self,doc_ids,entity_type):
         '''Ground truth annotation index'''
         label_idx = {}
         for pmid in doc_ids:
             label_idx[pmid] = {}
             doc = self.__getitem__(pmid)
-            for sentence,tags in zip(doc["sentences"],doc["tags"]):
+            for sentence,tags in zip(doc["sentences"],doc["tags"][entity_type]):
                 if sentence.sent_id not in label_idx[pmid]:
                     label_idx[pmid][sentence.sent_id] = {}
                 for text,offset in tags:
@@ -216,12 +221,12 @@ class CdrCorpus(Corpus):
         return (c.doc_id, c.sent_id, tuple(c.idxs), char_span, "".join(c.mention()))
         #return (c.doc_id, c.sent_id, tuple(c.idxs), "".join(c.mention()))
     
-    def force_longest_match(self, candidates, probability, doc_ids=None):
+    def force_longest_match(self, candidates, probability, entity_type="chemicals", doc_ids=None):
         '''Only use longest correct match for any set of overlapping or 
         adjoining mentions'''
     
         c_index = self._candidate_index(candidates)
-        true_labels = set(self._ground_truth(doc_ids))
+        true_labels = set(self._ground_truth(doc_ids,entity_type))
         pred_idx = {self.getkey(c):i for i,c in enumerate(candidates)}
         
         mapping = {}
@@ -246,10 +251,10 @@ class CdrCorpus(Corpus):
                 probability[pred_idx[self.getkey(c)]] = -1
 
     
-    def error_analysis_v1(self, candidates, prediction, doc_ids=None):
+    def error_analysis_v1(self, candidates, prediction, entity_type="chemicals", doc_ids=None):
         
         c_index = self._candidate_index(candidates)
-        true_labels = set(self._ground_truth(doc_ids))
+        true_labels = set(self._ground_truth(doc_ids,entity_type))
         
         mapping,claimed = {},{}
         for label in true_labels:
@@ -257,14 +262,12 @@ class CdrCorpus(Corpus):
             mapping[label] = self.match(label,candidates,c_index)
             claimed.update({self.getkey(c):1 for c in mapping[label]})
         
-        #pred_idx = {self.getkey(c):prediction[i] for i,c in enumerate(candidates)}
-
-
-    def error_analysis(self, candidates, prediction, doc_ids=None):
+      
+    def error_analysis(self, candidates, prediction, entity_type="chemicals", doc_ids=None):
         
         c_index = self._candidate_index(candidates)
-        l_index = self._label_index(doc_ids)
-        true_labels = set(self._ground_truth(doc_ids))
+        l_index = self._label_index(doc_ids,entity_type)
+        true_labels = set(self._ground_truth(doc_ids,entity_type))
         
         mapping,claimed = {},{}
         for label in true_labels:
@@ -433,8 +436,8 @@ class CdrCorpus(Corpus):
                     self.annotations[pmid] += [label]
                 
                 # create entity 
-                for label in self.annotations[pmid]:
-                    print "ADD TO MAPPING"
+                #for label in self.annotations[pmid]:
+                #    print "ADD TO MAPPING"
                 
             # validate there are no duplicate annotations
             labels = [ map(lambda x:(pmid,x), self.annotations[pmid]) for pmid in self.cv[setname]]
@@ -442,7 +445,9 @@ class CdrCorpus(Corpus):
       
             # validation
             # See "Annotating chemicals, diseases and their interactions in biomedical literature"
-            validation = {"testing":4424, "development":4244, "training":4182}
-            print "Gold Labels", setname, len(labels), validation[setname] == len(labels)
+            diseases_v = {"testing":4424, "development":4244, "training":4182}
+            chemicals_v = {"testing":5385 , "development":5347, "training":5203}
+            
+            print "Gold Labels", setname, len(labels), (diseases_v[setname] + chemicals_v[setname]) == len(labels)
         
             
