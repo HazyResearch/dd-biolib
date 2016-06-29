@@ -34,7 +34,7 @@ class ChemdnerCorpus(Corpus):
             self.documents[pmid]["body"] = self.documents[pmid]["body"]
             
             doc_str = "%s %s" % (self.documents[pmid]["title"], self.documents[pmid]["body"])
-            self.documents[pmid]["sentences"] = [s for s in self.parser.parse(doc_str)]
+            self.documents[pmid]["sentences"] = [s for s in self.parser.parse(doc_str,doc_id=pmid)]
             
             # initialize annotations   
             self.documents[pmid]["tags"] = []
@@ -80,14 +80,15 @@ class ChemdnerCorpus(Corpus):
                             s_end = j + 1
                         else:
                             break
-                            
+                    
+                    '''     
                     if label.text != " ".join(sents[start].words[s_start:s_end]):
                         print 
                         print zip(sents[start].token_idxs[s_start:],sents[start].words[s_start:])
                         print " ".join(sents[start].words[s_start:])
                         print "label:", label.text, (s_start,s_end)
                         print "text: ", " ".join(sents[start].words[s_start:s_end])
-                        
+                    '''
                     #tags[i] += [ (label.text,(s_start,s_end)) ]
                     tokenized_text = " ".join(sents[start].words[s_start:s_end])
                     tags[i] += [ (tokenized_text,(s_start,s_end)) ]

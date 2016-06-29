@@ -6,16 +6,6 @@ import itertools
 from ddlite import *
 from datasets import CdrCorpus
 
-'''
--blocking
--induced
--resistant
--associated
--related
--devoid
--containing
-specific
-'''
 
 def build_hypenated_dict(labels,stopwords={}):
     hypenated = {}
