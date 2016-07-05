@@ -316,6 +316,7 @@ class MetaNorm(object):
         s = re.sub("[(\[<].+[>)\]]$", "", s)
         s = re.sub("(\[brand name\]|[,]* NOS)+","", s).strip()
         s = s.strip().strip("_").strip(":")
+        #s = re.sub("(\[[X|D]\])+","", s).strip()
         
         # custom normalize function
         s = self.function(s)
