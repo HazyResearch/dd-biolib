@@ -79,6 +79,46 @@ class HackDictionaryMatcher(RegexNgramMatch):
 
 
 
+
+class NounPhraseMatcher(CandidateExtractor):
+    
+    def init(self):
+        self.pattern = re.compile("(NN[SP]*|JJ[S]*|DT|CC)") 
+        self.label         = self.opts['label']
+        self.match_attrib  = self.opts.get('match_attrib', 'words')
+        self.ignore_case   = self.opts.get('ignore_case', True)
+        self.longest_match = self.opts.get('longest_match', True) 
+       
+    def _apply(self, s, idxs=None):
+        
+        noun_phrases = []
+        np = []
+        for i,tag in enumerate(s.poses):
+            if self.pattern.search(tag):
+                np += [(i,tag)]
+            elif np:
+                noun_phrases += [np]
+                np = []
+         
+        for np in noun_phrases:
+            
+            while np and re.search("(CC|[PW]*DT)",np[0][1]):
+                np.pop(0)
+                
+            while np and re.search("(CC|[PW]*DT)",np[-1][1]):
+                np.pop()
+            
+            if not np or re.search("JJ[RS]*",np[0][1]):
+                continue
+            
+            idxs,poses = zip(*np)
+            
+            #print np, s.words[min(idxs):max(idxs)+1]
+            #print "----"
+            yield list(idxs), 'x'
+        
+      
+
 def load_bioportal_csv_dictionary(filename):
     '''BioPortal Ontologies
     http://bioportal.bioontology.org/'''
@@ -202,9 +242,10 @@ cache = "{}/cache/".format(INDIR)
 infile = "{}/corpora/".format(INDIR)
 holdouts = ["training","development","testing"]
 
-parser = SentenceParser()
-corpus = NcbiDiseaseCorpus(infile, parser, cache_path=cache)
+#parser = SentenceParser()
+corpus = NcbiDiseaseCorpus(infile, parser=None, cache_path=cache)
 
+'''
 for doc_id in ['10923035']:# corpus.cv["training"]:
     doc = corpus[doc_id]
     print doc_id
@@ -213,22 +254,11 @@ for doc_id in ['10923035']:# corpus.cv["training"]:
     print "--------"
 
 sys.exit()
-
-'''
-d = create_corpus_dict(corpus,"development")
-fname = "dicts/ncbi_development_diseases.txt"
-with codecs.open(fname,"w",'utf-8') as f:
-    f.write("\n".join(d.keys()))
-
-d = create_corpus_dict(corpus,"testing")
-fname = "dicts/ncbi_testing_diseases.txt"
-with codecs.open(fname,"w",'utf-8') as f:
-    f.write("\n".join(d.keys()))
-sys.exit()
 '''
 
-oracle = create_corpus_dict(corpus,"development")
-oracle.update(create_corpus_dict(corpus,"testing"))
+
+#oracle = create_corpus_dict(corpus,"development")
+#oracle.update(create_corpus_dict(corpus,"testing"))
 
 #dev_set = list(itertools.chain.from_iterable([corpus.cv[setdef].keys() for setdef in holdouts]))
 #documents, gold_entities = zip(*[(corpus[doc_id]["sentences"],corpus[doc_id]["tags"]) for doc_id in dev_set])
@@ -236,24 +266,27 @@ oracle.update(create_corpus_dict(corpus,"testing"))
 dev_set = list(itertools.chain.from_iterable([corpus.cv[setdef].keys() for setdef in holdouts]))
 documents, gold_entities = zip(*[(corpus[doc_id]["sentences"],corpus[doc_id]["tags"]) for doc_id in dev_set])
 
+'''
 # summary statistics
 num_gold_entities = sum([len(s) for s in list(itertools.chain.from_iterable(gold_entities))])
 num_tokens = sum([len(sent.words) for sent in list(itertools.chain.from_iterable(documents))])
 print("%d PubMed abstracts" % len(documents))
 print("%d Disease gold entities" % num_gold_entities)
 print("%d tokens" % num_tokens)
-
+'''
 # --------------------------------------------
 # Match Candidates
 # --------------------------------------------
+longest_match = True
 
+'''
 diseases = load_disease_dictionary(ROOT)
 acronyms = load_acronym_dictionary(ROOT)
 
-longest_match = True
+
 matcher_d = DictionaryMatch(label='disease', dictionary=diseases, ignore_case=True, longest_match=longest_match)
 matcher_a = DictionaryMatch(label='disease_acronyms', dictionary=acronyms, ignore_case=False, longest_match=longest_match)
-matcher_oracle = DictionaryMatch(label='disease_oracle', dictionary=oracle, ignore_case=False, longest_match=longest_match)
+#matcher_oracle = DictionaryMatch(label='disease_oracle', dictionary=oracle, ignore_case=False, longest_match=longest_match)
 
 pattern = re.compile("((NN[SP]*|JJ)\s*){2,}")  
 disease_terms = diseases.keys()
@@ -263,21 +296,31 @@ matcher_jj = PrefixDictionaryMatcher(label="D",match_attrib="poses",
                                        dictionary=disease_terms, longest_match=longest_match,
                                        regex_pattern=pattern,ignore_case=False)
 
-
-
+'''
+'''
 pattern = re.compile("((NN[SP]*|JJ)\s*){2,}")  
 matcher_np = RegexNgramMatch(label="D",match_attrib="poses",
                              longest_match=longest_match,
                              regex_pattern=pattern,ignore_case=False)
+'''
 
+'''
+pattern = re.compile("((NN[SP]*|JJ[S]*|DT|CC)\s*){2,}")  
+matcher_np = RegexNgramMatch(label="D",match_attrib="poses",
+                             longest_match=longest_match,
+                             regex_pattern=pattern,ignore_case=False)
+'''
 
-matcher = Union(matcher_a, matcher_d, matcher_oracle)
+matcher_np = NounPhraseMatcher(label='NP') #matcher_np #Union(matcher_a, matcher_d, matcher_oracle)
+print "matcher"
 
+matcher = matcher_np
+#matcher = Union(matcher_a,matcher_d,matcher_np)
 
 gold_labels = []
 scores = {"num_candidates":0, "num_cand_tokens":0,"class_balance":{}}
 
-for cv_set in holdouts:
+for cv_set in ["training"]:# holdouts:
     scores["class_balance"][cv_set] = {}
     
     sentences = [corpus[doc_id]["sentences"] for doc_id in corpus.cv[cv_set]]
@@ -285,7 +328,8 @@ for cv_set in holdouts:
     
     candidates = Entities(sentences, matcher)
     gold_labels = corpus.gold_labels(candidates)
-
+    
+    
     pred = [1] * len(candidates)
     scores[cv_set] = corpus.score(candidates, pred)
     scores["num_candidates"] += len(candidates)
@@ -297,16 +341,37 @@ for cv_set in holdouts:
     scores["class_balance"][cv_set]["T"] = len(tp)
     scores["class_balance"][cv_set]["F"] = len(candidates) - len(tp)
     
+    # training (1650+1351)/4993  60 %
+    # dev      (231+328)/773     72 %
+    # testing  (286+237)/943     55 %
+    
+    '''
     for item in fn:
         doc_id,sent_id,idxs,char_span,txt = item
         print "FN"
         print [corpus[doc_id]['sentences'][sent_id].words[i] for i in idxs]
         print [corpus[doc_id]['sentences'][sent_id].poses[i] for i in idxs]
         print
+    '''
     np.save("{}/{}-ncbi-diseases-gold.npy".format(OUTDIR,cv_set), gold_labels)
     candidates.dump_candidates("{}/{}-ncbi-candidates.pkl".format(OUTDIR,cv_set))
     
-
+    partial,complete = corpus.error_analysis(candidates, pred, doc_ids=corpus.cv[cv_set])
+    print cv_set, len(tp),len(fp),len(fn) 
+    print len(partial)
+    print len(complete)
+    
+    for item in complete:
+        uid,sent_id,idxs,char_span,text = item
+        s = corpus[uid]["sentences"][sent_id]
+        print text
+        print s.text
+        print s.poses
+        print
+    
+    print "--------------------"
+    
+num_tokens = 1
 # candidate recall
 print("Found %d candidate entities (%.2f%% of all tokens)" % (scores["num_candidates"],
                                                               scores["num_cand_tokens"]/float(num_tokens)*100)) 

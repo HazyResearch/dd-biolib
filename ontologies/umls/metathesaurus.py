@@ -134,6 +134,13 @@ class Metathesaurus(object):
         return results if counts else zip(*results)[0]
     
     
+    def get_tty_list(self,ignore=['OAS','OAP','OAF','OAS','FN','OF','MTH_OF',
+                                  'MTH_IS','LPN','CSN','PCE','N1','AUN','IS']):
+        sql = "SELECT distinct TTY FROM MRCONSO;"
+        results = self.conn.query(sql)
+        ignore = dict.fromkeys(ignore)
+        return [tty[0] for tty in results if tty not in ignore]
+    
     def get_semtypes_list(self, counts=False):
         """ Get distinct UMLS semantic types and their occurrence counts."""
         sql = "SELECT DISTINCT(STY),count(STY) FROM MRSTY GROUP BY STY"
@@ -161,9 +168,8 @@ class Metathesaurus(object):
     
     
     def dictionary(self, semantic_type, source_vocab=[], cui_dict=False, 
-                   exclude_subtrees=[],
-                   ignore_tty=['OAS','OAP','OAF','OAS','FN','OF','MTH_OF',
-                               'MTH_IS','LPN','CSN','PCE','N1','AUN','IS']):
+                   include_children=True, exclude_subtrees=[],
+                   term_types=[]):
         """Build dictionary of UMLS entities 
         
         Parameters
@@ -185,15 +191,21 @@ class Metathesaurus(object):
             Include all child nodes from target semantic type. This should
             always remain True
              
-        ignore_tty: array
+        term_types: array
             Ignore certain term types (see docs/concept_schema.txt)
             
         """
+        term_types = term_types if term_types else self.get_tty_list()
+        
         # get all children of provided semantic type
         network = self.semantic_network.graph("isa")
         
         # exclude subtrees
-        children = [node for node in nx.bfs_tree(network, semantic_type)]
+        if include_children:
+            children = [node for node in nx.bfs_tree(network, semantic_type)]
+        else:
+            children = [semantic_type]
+            
         if exclude_subtrees:
             rm = [nx.bfs_tree(network, subtree_root).nodes() for subtree_root in exclude_subtrees]
             children = [node for node in children if node not in reduce(lambda x,y:x+y,rm)]
@@ -205,18 +217,22 @@ class Metathesaurus(object):
         else:
             sab = self._source_vocab_sql(self.source_vocab)
         
-        tty = "" if not ignore_tty else "(%s)" % " AND ".join(map(lambda x:"TTY!='%s'" % x, ignore_tty))
+        #tty = "" if not term_types else "(%s)" % " OR ".join(map(lambda x:"TTY='%s'" % x, term_types))
+        tty = "(%s)" % " OR ".join(map(lambda x:"TTY='%s'" % x, term_types))
         terms = " AND ".join([x for x in [sab,tty] if x])
         
         sql = """SELECT C.CUI,TTY,STR,STY FROM MRCONSO AS C, MRSTY AS S 
                  WHERE %s C.CUI=S.CUI AND (%s)"""
         
         sql = sql % (terms + " AND", children) if terms else sql % (terms,children)
+        
         results = self.conn.query(sql)
         
         # collapse to unique strings
         if not cui_dict:
             vocab = {self.norm.normalize(row[2]):1 for row in results}
+            if "" in vocab:
+                del vocab[""]
         else:
             vocab = {row[0]:1 for row in results}
             
@@ -316,7 +332,7 @@ class Concept(object):
         
         # see docs/concept_schema for an explanation of these term type flags
         self.ignore_tty ={x:0 for x in ['OAS','OAP','OAF','OAS','FN','OF',
-                                        'MTH_OF','MTH_IS','LPN','CSN',
+                                        'MTH_OF','MTH_IS','CSN',
                                         'PCE','N1','AUN','IS']}
         self.synset = {x:0 for x in ['SY','SYN','SS','VSY','USY','RSY']}
         self.abbrvset = {x:0 for x in ['AA','AB','ACR']}
