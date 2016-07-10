@@ -1,9 +1,8 @@
-import sys
 import re
 import os
-import config
-import database
+import sys
 import networkx as nx
+from utils import database
 from config import DEFAULT_UMLS_CONFIG
 from semantic_network import SemanticNetwork
 
@@ -160,6 +159,7 @@ class Metathesaurus(object):
         self.term_types = [tty[0] for tty in results if tty not in ignore]
         return self.term_types
     
+    
     def get_semtypes_list(self, counts=False):
         """ Get distinct UMLS semantic types and their occurrence counts."""
         sql = "SELECT DISTINCT(STY),count(STY) FROM MRSTY GROUP BY STY"
@@ -185,71 +185,7 @@ class Metathesaurus(object):
         results = self.conn.query(sql)
         return [cui[0] for cui in results]
 
-    
-    def dictionary2(self, semantic_type, source_vocab=[], cui_dict=False, 
-                   include_children=True, exclude_subtrees=[],
-                   term_types=[]):
-        """Build dictionary of UMLS entities 
         
-        Parameters
-        ----------
-        semantic_type: string
-            Target UMLS semantic type root
-        
-        source_vocab: array
-            Override object source vocabularies (SAB) used for building
-            lexical variations dictionary.
-        
-        exclude_subtrees: array
-            List of subtree root nodes to remove from ontology
-        
-        cui_dict: boolean
-            Instead of strings, return dictionary of CUIs
-        
-        include_children: boolean
-            Include all child nodes from target semantic type. This should
-            always remain True
-             
-        term_types: array
-            Ignore certain term types (see docs/concept_schema.txt)
-            
-        """
-        term_types = term_types if term_types else self.get_tty_list()
-        
-        # get all children of provided semantic type
-        network = self.semantic_network.graph("isa")
-        children = [node for node in nx.bfs_tree(network, semantic_type)] \
-                if include_children else [semantic_type]
-            
-        if exclude_subtrees:
-            rm = [nx.bfs_tree(network, subtree_root).nodes() for subtree_root in exclude_subtrees]
-            children = [node for node in children if node not in reduce(lambda x,y:x+y,rm)]
-        children = " OR ".join(map(lambda x:"STY='%s'" % x, children))
-        
-        # override object default source vocabulary?
-        sab = self._source_vocab_sql(source_vocab) if source_vocab else \
-              self._source_vocab_sql(self.source_vocab)
-        
-        tty = "TTY IN (%s)" % ",".join(map(lambda x:"'%s'" % x, term_types))
-        terms = " AND ".join([x for x in [sab,tty] if x])
-        
-        sql = """SELECT C.CUI,TTY,STR,STY FROM MRCONSO AS C, MRSTY AS S 
-                 WHERE %s C.CUI=S.CUI AND (%s)"""
-        
-        sql = sql % (terms + " AND", children) if terms else sql % (terms,children)
-        results = self.conn.query(sql)
-        
-        # collapse to unique strings
-        if not cui_dict:
-            vocab = {self.norm.normalize(row[2]):1 for row in results}
-            if "" in vocab:
-                del vocab[""]
-        else:
-            vocab = {row[0]:1 for row in results}
-            
-        return vocab.keys()
-    
-    
     def dictionary(self, semantic_type, source_vocab=[], cui_dict=False, 
                    include_children=True, exclude_subtrees=[],
                    term_types=[]):

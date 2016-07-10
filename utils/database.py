@@ -15,9 +15,7 @@ class DatabaseI(object):
         self.database = database
         self.encoding = encoding
         self.conn = None
-        
-        #print(self.host,self.user, self.password, self.database)
-        
+    
     def connect(self):
         raise NotImplementedError()
 

@@ -1,6 +1,11 @@
 '''
 Noise-aware Dictionary
 
+Create a snapshot of all UMLS terminology, broken down by
+semantic type (STY) and source vocabulary (SAB).
+Treat these as competing experts, generating labeling 
+functions for each
+
 @author: jason-fries [at] stanford [dot] edu
 '''
 import os
@@ -9,7 +14,9 @@ import bz2
 import sys
 import glob
 import codecs
-import database
+from utils import database
+import subprocess
+from functools import partial
 from collections import defaultdict
 from config import DEFAULT_UMLS_CONFIG
 
@@ -21,12 +28,12 @@ def dict_function_factory(dictionary,rvalue,name,ignore_case=True):
     function_template.__name__ = name
     return function_template
 
-def build_umls_dictionaries(config):
+def build_umls_dictionaries(config,min_occur=50):
     '''Create UMLS dictionaries broken down by semantic type and
     source vocabulary. Term types (TTY) are used to filter out 
     obselete terms an '''
     module_path = os.path.dirname(__file__)
-    filelist = glob.glob("{}/data/cache/*.txt".format(module_path))
+    filelist = glob.glob("{}/data/cache/*/*.txt".format(module_path))
     if len(filelist) > 0:
         return
     
@@ -41,37 +48,49 @@ def build_umls_dictionaries(config):
     sql = "".join(open(sql_tmpl,"rU").readlines())
     
     results = conn.query(sql)
-    abbrv,terms = {},{}
+    #abbrv,terms = {},{}
+    abbrv = defaultdict(partial(defaultdict, defaultdict))
+    terms = defaultdict(partial(defaultdict, defaultdict))
     
     for row in results:
         text,sty,sab,tty = row
         sty = sty.lower().replace(" ","_")
         if tty in abbrv_tty:
+            '''
             if sty not in abbrv:
                 abbrv[sty] = {}
             if sab not in abbrv[sty]:
                 abbrv[sty][sab] = {}
+            '''
             abbrv[sty][sab][text] = 1
         elif tty not in not_term_tty:
+            '''
             if sty not in terms:
                 terms[sty] = {}
             if sab not in terms[sty]:
                 terms[sty][sab] = {}
+            '''
             terms[sty][sab][text.lower()] = 1
             
     for sty in abbrv:
         for sab in abbrv[sty]:
             outfname = "{}/data/cache/abbrvs/{}.{}.abbrv.txt".format(module_path,sty,sab) 
-            t = abbrv[sty][sab].keys()
-            with open(outfname,"w") as f:
+            t = sorted(abbrv[sty][sab].keys())
+            if len(t) < min_occur:
+                continue
+            with codecs.open(outfname,"w","utf-8",errors="ignore") as f:
                 f.write("\n".join(t))
+            subprocess.call(["bzip2", outfname]) # compress file
 
     for sty in terms:
         for sab in terms[sty]:
             outfname = "{}/data/cache/terms/{}.{}.txt".format(module_path,sty,sab) 
-            t = terms[sty][sab].keys()
-            with open(outfname,"w") as f:
-                f.write("\n".join(t))           
+            t = sorted(terms[sty][sab].keys())
+            if len(t) < min_occur:
+                continue
+            with codecs.open(outfname,"w","utf-8",errors="ignore") as f:
+                f.write("\n".join(t))  
+            subprocess.call(["bzip2", outfname]) # compress file                
     
 
 class UmlsNoiseAwareDict(object):
@@ -95,7 +114,8 @@ class UmlsNoiseAwareDict(object):
         return s.lower().replace(" ","_")
     
     def _load_dictionaries(self):
-        ''' '''
+        '''Load dictionaries base on provided postive/negative 
+        entity examples'''
         d = defaultdict(defaultdict)
         filelist = glob.glob("{}*.txt.bz2".format(self.rootdir))
     
@@ -129,7 +149,6 @@ class UmlsNoiseAwareDict(object):
                 yield dict_function_factory(self.dictionary[sty][sab],rvalue,
                                             func_name,self.ignore_case)
                 
-
 
 if __name__ == "__main__":
     build_umls_dictionaries(DEFAULT_UMLS_CONFIG)             

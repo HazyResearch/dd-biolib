@@ -3,12 +3,9 @@ import sys
 import re
 import os
 import config
-import database
 import operator
 import networkx as nx
-import mysql.connector
-
-module_path = os.path.dirname(__file__)
+from utils import database
 
 class SemanticNetwork(object):
     """
@@ -18,31 +15,25 @@ class SemanticNetwork(object):
     https://www.ncbi.nlm.nih.gov/books/NBK9679/
 
     """
-    def __init__(self,conn=None):
+    def __init__(self,config):
         
-        if not conn:
-            self.conn = database.MySqlConn(config.HOST, config.USER, 
-                                       config.DATABASE, config.PASSWORD)
-            self.conn.connect()
-        else:
-            self.conn = conn
-            
+        self.conn = database.MySqlConn(config.host, config.username, 
+                                       config.dbname, config.password)
+        self.conn.connect()
         self._networks = {}
-        
         # load semantic group definitions
         self.abbrv, self.groups = self.__load_sem_groups()
         
         
     def __load_sem_groups(self):
-        '''
-        UMLS Semantic Groups(
-        ACTI|Activities & Behaviors|T051|Event
-        '''
+        '''UMLS Semantic Groups '''
+        module_path = os.path.dirname(__file__)
         fname = "%s/data/SemGroups.txt" % (module_path)
         abbrvs = {}
         isas = {}
         with open(fname,"rU") as f:
             for line in f:
+                # format: ACTI|Activities & Behaviors|T051|Event
                 abbrv,parent,tid,child = line.strip().split("|")
                 abbrvs[abbrv] = parent
                 if parent not in isas:
