@@ -2,11 +2,11 @@ import argparse
 import sys
 import re
 import os
-import mysql.connector
+import config
+import database
 import operator
 import networkx as nx
-import database
-from ontologies.umls import config
+import mysql.connector
 
 module_path = os.path.dirname(__file__)
 

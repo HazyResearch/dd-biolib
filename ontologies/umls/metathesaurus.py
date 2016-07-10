@@ -1,8 +1,7 @@
 import sys
 import re
 import os
-import ontologies.umls
-from ontologies.umls import config
+import config
 import database
 import networkx as nx
 
@@ -39,7 +38,19 @@ class Metathesaurus(object):
         self._concepts = {}
         self._networks = {}
         
+        self.term_types = None
+        self.source_vocab_defs = None
+        self._sql_tmpl = {}
 
+    def _load_sql_tmpl(self,fname):
+        if fname in self._sql_tmpl:
+            return self._sql_tmpl[fname]
+        with open("{}/sql_tmpl/{}".format(module_path,fname),"rU") as f:
+            tmpl = " ".join(f.readlines())
+            self._sql_tmpl[fname] = tmpl
+            return tmpl
+            
+    
     def concept_graph(self, level="CUI", relation=["CHD"],  
                       source_vocab=[], simulate_root=True):
         
@@ -108,6 +119,9 @@ class Metathesaurus(object):
     
     def get_source_vocabulary_defs(self):
         """Return dictionary of UMLS source vocabularies descriptions."""
+        if self.source_vocab_defs:
+            return self.source_vocab_defs
+        
         sql = "SELECT RSAB,SON,SF,SVER,CENC FROM MRSAB"    
         results = self.conn.query(sql)
         summary = {}
@@ -115,7 +129,8 @@ class Metathesaurus(object):
         for row in results:
             sab,name,key,ver,enc = row
             summary[sab] = summary.get(sab,[]) + [name]
-            
+        
+        self.source_vocab_defs = summary
         return summary
     
                 
@@ -136,10 +151,14 @@ class Metathesaurus(object):
     
     def get_tty_list(self,ignore=['OAS','OAP','OAF','OAS','FN','OF','MTH_OF',
                                   'MTH_IS','LPN','CSN','PCE','N1','AUN','IS']):
+        if self.term_types:
+            return self.term_types
+        
         sql = "SELECT distinct TTY FROM MRCONSO;"
         results = self.conn.query(sql)
         ignore = dict.fromkeys(ignore)
-        return [tty[0] for tty in results if tty not in ignore]
+        self.term_types = [tty[0] for tty in results if tty not in ignore]
+        return self.term_types
     
     def get_semtypes_list(self, counts=False):
         """ Get distinct UMLS semantic types and their occurrence counts."""
@@ -165,9 +184,9 @@ class Metathesaurus(object):
         
         results = self.conn.query(sql)
         return [cui[0] for cui in results]
+
     
-    
-    def dictionary(self, semantic_type, source_vocab=[], cui_dict=False, 
+    def dictionary2(self, semantic_type, source_vocab=[], cui_dict=False, 
                    include_children=True, exclude_subtrees=[],
                    term_types=[]):
         """Build dictionary of UMLS entities 
@@ -218,13 +237,83 @@ class Metathesaurus(object):
             sab = self._source_vocab_sql(self.source_vocab)
         
         #tty = "" if not term_types else "(%s)" % " OR ".join(map(lambda x:"TTY='%s'" % x, term_types))
-        tty = "(%s)" % " OR ".join(map(lambda x:"TTY='%s'" % x, term_types))
+        #tty = "(%s)" % " OR ".join(map(lambda x:"TTY='%s'" % x, term_types))
+        #terms = " AND ".join([x for x in [sab,tty] if x])
+        
+        tty = "TTY IN (%s)" % ",".join(map(lambda x:"'%s'" % x, term_types))
         terms = " AND ".join([x for x in [sab,tty] if x])
         
         sql = """SELECT C.CUI,TTY,STR,STY FROM MRCONSO AS C, MRSTY AS S 
                  WHERE %s C.CUI=S.CUI AND (%s)"""
         
         sql = sql % (terms + " AND", children) if terms else sql % (terms,children)
+        
+        results = self.conn.query(sql)
+        
+        print sql
+        sys.exit()
+        # collapse to unique strings
+        if not cui_dict:
+            vocab = {self.norm.normalize(row[2]):1 for row in results}
+            if "" in vocab:
+                del vocab[""]
+        else:
+            vocab = {row[0]:1 for row in results}
+            
+        return vocab.keys()
+    
+    
+    def dictionary(self, semantic_type, source_vocab=[], cui_dict=False, 
+                   include_children=True, exclude_subtrees=[],
+                   term_types=[]):
+        """Build dictionary of UMLS entities 
+        
+        Parameters
+        ----------
+        semantic_type: string
+            Target UMLS semantic type root
+        
+        source_vocab: array
+            Override object source vocabularies (SAB) used for building
+            lexical variations dictionary.
+        
+        exclude_subtrees: array
+            List of subtree root nodes to remove from ontology
+        
+        cui_dict: boolean
+            Instead of strings, return dictionary of CUIs
+        
+        include_children: boolean
+            Include all child nodes from target semantic type. This should
+            always remain True
+             
+        term_types: array
+            Ignore certain term types (see docs/concept_schema.txt)
+            
+        """
+        tmpl = self._load_sql_tmpl("dictionary.sql")
+        term_types = term_types if term_types else self.get_tty_list()
+        network = self.semantic_network.graph("isa")
+        
+        # exclude subtrees
+        if include_children:
+            children = [node for node in nx.bfs_tree(network, semantic_type)]
+        else:
+            children = [semantic_type]
+            
+        if exclude_subtrees:
+            rm = [nx.bfs_tree(network, subtree_root).nodes() for subtree_root in exclude_subtrees]
+            children = [node for node in children if node not in reduce(lambda x,y:x+y,rm)]
+        children = "STY IN ({})".format(",".join(map(lambda x:"'%s'" % x, children)))
+        
+        # override object default source vocabulary?
+        if source_vocab:
+            sab = self._source_vocab_sql(source_vocab)
+        else:
+            sab = self._source_vocab_sql(self.source_vocab)
+        
+        tty = "TTY IN (%s)" % ",".join(map(lambda x:"'%s'" % x, term_types))
+        sql = tmpl.format(sab,tty,children)
         
         results = self.conn.query(sql)
         
@@ -316,7 +405,8 @@ class MetaNorm(object):
         s = re.sub("[(\[<].+[>)\]]$", "", s)
         s = re.sub("(\[brand name\]|[,]* NOS)+","", s).strip()
         s = s.strip().strip("_").strip(":")
-        #s = re.sub("(\[[X|D]\])+","", s).strip()
+        s = re.sub("(\[.{1}\])+","", s).strip()
+        s = re.sub("\-RETIRED\-$","",s).strip()
         
         # custom normalize function
         s = self.function(s)

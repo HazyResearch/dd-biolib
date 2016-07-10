@@ -176,7 +176,8 @@ class CdrCorpus(Corpus):
             for sentence,tags in zip(doc["sentences"],doc["tags"][entity_type]):
                 if sentence.sent_id not in label_idx[pmid]:
                     label_idx[pmid][sentence.sent_id] = {}
-                for text,offset in tags:
+                for item in tags:
+                    text,offset = item[0:2]
                     label_idx[pmid][sentence.sent_id][offset] = text
         return label_idx
     
