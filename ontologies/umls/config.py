@@ -1,14 +1,13 @@
-HOST = "127.0.0.1"
-USER = "umls"
-DATABASE = "2014AB"
-PASSWORD = ""
+from collections import namedtuple
 
-#HOST = "rocky.stanford.edu"
-#USER = "umls_guest"
-#PASSWORD = "publicUMLSsnapshot"
-#DATABASE = "umls"
+DatabaseConfig = namedtuple("DatabaseConfig",["host","username","dbname","password"])
 
-CACHE_RESULTS = True
-CACHE_DIR = "data/"
+DEFAULT_UMLS_CONFIG = DatabaseConfig(host="127.0.0.1",
+                                     username="umls",
+                                     dbname="2014AB",
+                                     password="")
 
-BIOPORTAL_API_KEY=""
+STANFORD_UMLS_CONFIG = DatabaseConfig(host="rocky.stanford.edu",
+                                     username="umls_guest",
+                                     dbname="publicUMLSsnapshot",
+                                     password="umls")

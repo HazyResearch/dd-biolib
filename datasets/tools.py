@@ -1,7 +1,7 @@
-def strip_unicode_chars(s):
-    pass
 
-        
+
+
+
 def unescape_penn_treebank(words):
     '''Replace PennTreeBank tags and other CoreNLP modifications. This is
     pretty much a hack. '''

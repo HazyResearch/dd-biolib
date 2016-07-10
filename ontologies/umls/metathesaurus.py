@@ -4,9 +4,8 @@ import os
 import config
 import database
 import networkx as nx
-
-
-module_path = os.path.dirname(__file__)
+from config import DEFAULT_UMLS_CONFIG
+from semantic_network import SemanticNetwork
 
 class Metathesaurus(object):
     """
@@ -25,16 +24,15 @@ class Metathesaurus(object):
     TODO: optimize queries. make less hacky overall
     
     """
-    def __init__(self, source_vocab=[], cache=True):
+    def __init__(self, config, source_vocab=[]):
         
-        self.conn = database.MySqlConn(config.HOST, config.USER, 
-                                       config.DATABASE, config.PASSWORD)
+        self.conn = database.MySqlConn(config.host, config.username, 
+                                       config.dbname, config.password)
         self.conn.connect()
         self.norm = MetaNorm()
-        self.semantic_network = ontologies.umls.SemanticNetwork(self.conn)
+        self.semantic_network = SemanticNetwork(self.conn)
         
-        # source vocabularies (SAB)
-        self.source_vocab = source_vocab
+        self.source_vocab = source_vocab # source vocabularies (SAB)
         self._concepts = {}
         self._networks = {}
         
@@ -42,9 +40,12 @@ class Metathesaurus(object):
         self.source_vocab_defs = None
         self._sql_tmpl = {}
 
+
     def _load_sql_tmpl(self,fname):
+        '''Load SQL templates'''
         if fname in self._sql_tmpl:
             return self._sql_tmpl[fname]
+        module_path = os.path.dirname(__file__)
         with open("{}/sql_tmpl/{}".format(module_path,fname),"rU") as f:
             tmpl = " ".join(f.readlines())
             self._sql_tmpl[fname] = tmpl
@@ -53,7 +54,6 @@ class Metathesaurus(object):
     
     def concept_graph(self, level="CUI", relation=["CHD"],  
                       source_vocab=[], simulate_root=True):
-        
         """Build a concept graph for the target relation. 
         
         The REL field contains the relation type and RELA encodes the relation 
@@ -149,8 +149,8 @@ class Metathesaurus(object):
         return results if counts else zip(*results)[0]
     
     
-    def get_tty_list(self,ignore=['OAS','OAP','OAF','OAS','FN','OF','MTH_OF',
-                                  'MTH_IS','LPN','CSN','PCE','N1','AUN','IS']):
+    def get_tty_list(self,ignore=['OAS','OAP','OAF','FN','OF',
+                                  'MTH_OF','MTH_IS','LPN','AUN']):
         if self.term_types:
             return self.term_types
         
@@ -218,12 +218,8 @@ class Metathesaurus(object):
         
         # get all children of provided semantic type
         network = self.semantic_network.graph("isa")
-        
-        # exclude subtrees
-        if include_children:
-            children = [node for node in nx.bfs_tree(network, semantic_type)]
-        else:
-            children = [semantic_type]
+        children = [node for node in nx.bfs_tree(network, semantic_type)] \
+                if include_children else [semantic_type]
             
         if exclude_subtrees:
             rm = [nx.bfs_tree(network, subtree_root).nodes() for subtree_root in exclude_subtrees]
@@ -231,14 +227,8 @@ class Metathesaurus(object):
         children = " OR ".join(map(lambda x:"STY='%s'" % x, children))
         
         # override object default source vocabulary?
-        if source_vocab:
-            sab = self._source_vocab_sql(source_vocab)
-        else:
-            sab = self._source_vocab_sql(self.source_vocab)
-        
-        #tty = "" if not term_types else "(%s)" % " OR ".join(map(lambda x:"TTY='%s'" % x, term_types))
-        #tty = "(%s)" % " OR ".join(map(lambda x:"TTY='%s'" % x, term_types))
-        #terms = " AND ".join([x for x in [sab,tty] if x])
+        sab = self._source_vocab_sql(source_vocab) if source_vocab else \
+              self._source_vocab_sql(self.source_vocab)
         
         tty = "TTY IN (%s)" % ",".join(map(lambda x:"'%s'" % x, term_types))
         terms = " AND ".join([x for x in [sab,tty] if x])
@@ -247,11 +237,8 @@ class Metathesaurus(object):
                  WHERE %s C.CUI=S.CUI AND (%s)"""
         
         sql = sql % (terms + " AND", children) if terms else sql % (terms,children)
-        
         results = self.conn.query(sql)
         
-        print sql
-        sys.exit()
         # collapse to unique strings
         if not cui_dict:
             vocab = {self.norm.normalize(row[2]):1 for row in results}
@@ -441,7 +428,9 @@ class Concept(object):
             tty,string,ispref = row
             self._terms[string] = tty
             
-        #print(self._terms.keys()) 
+    def __repr__(self):
+        return "[{}] {}".format(self.cui, self.preferred_term()[0])
+        
                
     def definition(self,source_vocab=[]):
         """There are often multiple definitions conditioned on source vocabulary."""
@@ -501,3 +490,8 @@ class Concept(object):
         print(fmt.format("TERMS:", ", ".join(self.all_terms()) ))
         print("-----------------------------")
         
+if __name__ == "__main__":
+   
+    meta = Metathesaurus(config=DEFAULT_UMLS_CONFIG)
+    print meta.concept(cui="C0699142")
+    
