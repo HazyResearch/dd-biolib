@@ -6,10 +6,11 @@ CoreNLP wrapper
 import os
 import sys
 import json
+import glob
 import atexit
 import signal
 import requests
-from subprocess import Popen
+import subprocess
 from collections import defaultdict
 from .base import Sentence,SentenceParser
 
@@ -30,11 +31,17 @@ class CoreNlpParser(SentenceParser):
         # This makes sure that we load the models only once.
         # In addition, it appears that StanfordCoreNLPServer loads only required models on demand.
         # So it doesn't load e.g. coref models and the total (on-demand) initialization takes only 7 sec.
+        # install CoreNLP
+        module_path = os.path.dirname(__file__)
+        if len(glob.glob("{}/bin/*".format(module_path))) == 0:
+            print("Installing CoreNLP...")
+            self._install()
+        
         self.port = 12345
         self.tok_whitespace = tok_whitespace
-        loc = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'parser')
+        loc = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'bin')
         cmd = ['java -Xmx4g -cp "%s/*" edu.stanford.nlp.pipeline.StanfordCoreNLPServer --port %d > /dev/null' % (loc, self.port)]
-        self.server_pid = Popen(cmd, shell=True).pid
+        self.server_pid = subprocess.Popen(cmd, shell=True).pid
         atexit.register(self._kill_pserver)
         props = "\"tokenize.whitespace\": \"true\"," if self.tok_whitespace else "" 
         self.endpoint = 'http://127.0.0.1:%d/?properties={%s"annotators": "tokenize,ssplit,pos,lemma,depparse", "outputFormat": "json"}' % (self.port, props)
@@ -51,7 +58,13 @@ class CoreNlpParser(SentenceParser):
                         status_forcelist=[ 500, 502, 503, 504 ])
         self.requests_session.mount('http://', HTTPAdapter(max_retries=retries))
 
-
+    def _install(self):
+        '''Install corenlp'''
+        cwd = os.getcwd()
+        os.chdir("{}/parsers/".format(cwd))
+        subprocess.call(["./install-corenlp.sh"]) 
+        os.chdir(cwd)
+      
     def _kill_pserver(self):
         if self.server_pid is not None:
             try:
