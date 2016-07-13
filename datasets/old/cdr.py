@@ -6,9 +6,9 @@ import cPickle
 import operator
 import itertools
 import numpy as np
-from .base import *
+from datasets.old.base import *
 from ddlite import SentenceParser
-from .tools import unescape_penn_treebank,overlaps
+from datasets.old.tools import unescape_penn_treebank,overlaps
 
 class CdrCorpus(Corpus):
     '''The CDR corpus 

@@ -6,8 +6,8 @@ import codecs
 import cPickle
 from collections import namedtuple
 from collections import defaultdict
-from .base import *
-from .tools import unescape_penn_treebank
+from datasets.old.base import *
+from datasets.old.tools import unescape_penn_treebank
 
 class PubMedAbstractCorpus(Corpus):
     

@@ -1,34 +1,35 @@
 import os
-import re
-import sys
 import codecs
 import cPickle
-import operator
-import itertools
 import numpy as np
-from .base import *
-from .tools import unescape_penn_treebank,overlaps
+from collections import namedtuple
+from datasets.old.base import *
+from datasets.old.tools import unescape_penn_treebank,overlaps
 
-class NcbiDiseaseCorpus(Corpus):
-    '''The NCBI disease corpus is fully annotated at the mention and concept level 
-    to serve as a research resource for the biomedical natural language processing 
-    community. 
-                    -- from http://www.ncbi.nlm.nih.gov/CBBresearch/Dogan/DISEASE/
-                    
-        793 PubMed abstracts
-        6,892 disease mentions
-        790 unique disease concepts
-    '''
-    def __init__(self, path, parser, cache_path="/tmp/"):
-        super(NcbiDiseaseCorpus, self).__init__(path, parser)
+'''
+# Download ChemDNER corpus
+# See http://www.biocreative.org/resources/biocreative-iv/chemdner-corpus/
+wget http://www.biocreative.org/media/store/files/2014/chemdner_corpus.tar.gz
+gunzip chemdner_corpus.tar.gz
+tar xvf chemdner_corpus.tar
+mv chemdner_corpus datasets/
+'''
+
+
+Annotation = namedtuple('Annotation', ['text_type','start','end','text','mention_type'])
+
+class ChemdnerCorpus(Corpus):
+        
+    def __init__(self, path, parser, encoding="utf-8", cache_path="/tmp/"):
+        super(ChemdnerCorpus, self).__init__(path, parser, encoding)
         self.path = path
-        self.cv = {"training":{},"development":{},"testing":{}}
+        self.cv = {"training":{},"development":{},"evaluation":{}}
         self.documents = {}
         self.annotations = {}
-     
+        
         self._load_files()
         self.cache_path = cache_path
-      
+     
     def __getitem__(self,pmid):
         """Use PMID as key and load parsed document object"""
         pkl_file = "%s/%s.pkl" % (self.cache_path, pmid)
@@ -37,26 +38,20 @@ class NcbiDiseaseCorpus(Corpus):
         if os.path.exists(pkl_file):
             with open(pkl_file, 'rb') as f:
                 self.documents[pmid] = cPickle.load(f)
-        else:         
+        else:
             self.documents[pmid]["title"] = self.documents[pmid]["title"]
             self.documents[pmid]["body"] = self.documents[pmid]["body"]
-            # align gold annotations
-            title = self.documents[pmid]["title"]
-            body = self.documents[pmid]["body"]
-            doc_str = "%s %s" % (title,body)
-            try:
-                self.documents[pmid]["sentences"] = [s for s in self.parser.parse(doc_str,doc_id=pmid)]
-            except:
-                print "Parse Error"
-                print doc_str
-                self.documents[pmid]["sentences"] = []
-                
+            
+            doc_str = "%s %s" % (self.documents[pmid]["title"], self.documents[pmid]["body"])
+            self.documents[pmid]["sentences"] = [s for s in self.parser.parse(doc_str,doc_id=pmid)]
+            
+            # initialize annotations   
             self.documents[pmid]["tags"] = []
             if pmid in self.annotations:
-                self.documents[pmid]["tags"] = self._label(self.annotations[pmid],self.documents[pmid]["sentences"])
+                self.documents[pmid]["tags"] = self._label(self.annotations[pmid], self.documents[pmid]["sentences"])
             else:
-                self.documents[pmid]["tags"] += [[] for _ in range(len(self.documents[pmid]["sentences"]))]   
-                
+                self.documents[pmid]["tags"] += [[] for _ in range(len(self.documents[pmid]["sentences"]))]
+ 
             with open(pkl_file, 'w+') as f:
                 cPickle.dump(self.documents[pmid], f)
         
@@ -234,7 +229,7 @@ class NcbiDiseaseCorpus(Corpus):
             proba = [probability[pred_idx[self.getkey(c)]] for c in mapping[label]]
             scores = zip(proba,lengths,mapping[label])
             print [(x,y,z.mention()) for (x,y,z) in sorted(scores,reverse=1)]
-            #scores = [c for _,c,p in sorted(zip(lengths,mapping[label],proba),reverse=1) if p > 0.5]
+            
             scores = [c for p,l,c, in sorted(zip(proba,lengths,mapping[label]),reverse=1) if p > 0.499]
             
             if not scores:
@@ -245,24 +240,9 @@ class NcbiDiseaseCorpus(Corpus):
             
             for c in mapping[label]:
                 probability[pred_idx[self.getkey(c)]] = -1
-
     
-    def error_analysis_v1(self, candidates, prediction, doc_ids=None):
-        
-        c_index = self._candidate_index(candidates)
-        true_labels = set(self._ground_truth(doc_ids))
-        
-        mapping,claimed = {},{}
-        for label in true_labels:
-            # NOTE: candidates can touch multiple labels
-            mapping[label] = self.match(label,candidates,c_index)
-            claimed.update({self.getkey(c):1 for c in mapping[label]})
-        
-        #pred_idx = {self.getkey(c):prediction[i] for i,c in enumerate(candidates)}
-
-
-    def error_analysis(self, candidates, prediction, doc_ids=None):
-        
+    
+    def error_analysis(self, candidates, prediction, doc_ids=None):    
         c_index = self._candidate_index(candidates)
         l_index = self._label_index(doc_ids)
         true_labels = set(self._ground_truth(doc_ids))
@@ -292,28 +272,9 @@ class NcbiDiseaseCorpus(Corpus):
                 complete += [list(label)[0:-1] + [mtext]]
         
         return (partial,complete)
-        '''
-        print "-----------------------------------"
-        print "FN: Partial Matches"
-        print "-----------------------------------"
-        print len(partial)
-        for item in partial:
-            print item
-        
-        print "-----------------------------------"
-        print "FN: Complete Misses"
-        print "-----------------------------------"
-        print len(complete)
-        for item in complete:
-            print item
-        '''
-        
-        
-        
-        
+    
     def conll(self,doc_ids):
-        '''Export docs to CoNLL format'''
-        
+        '''Export docs to CoNLL format'''    
         outstr = []
         for doc_id in doc_ids:
             doc = self.__getitem__(doc_id)
@@ -331,8 +292,8 @@ class NcbiDiseaseCorpus(Corpus):
                 tags = [u'O'] * len(words)
                 for i in idx:
                     for label in idx[i]:
-                        bio2 = [u"<B-DISEASE>"]
-                        bio2 += [u"<I-DISEASE>"] * (len(label.split())-1)
+                        bio2 = [u"<B-CHEMICAL>"]
+                        bio2 += [u"<I-CHEMICAL>"] * (len(label.split())-1)
                         tags[i:idx[i][label]] = bio2
                 
                 s = zip(words,tags)
@@ -343,10 +304,7 @@ class NcbiDiseaseCorpus(Corpus):
         return "\n".join(outstr)
     
     def _label(self,annotations,sentences):
-        '''Convert annotations from NCBI offsets to parsed token offsets. 
-        NOTE: This isn't perfect, since tokenization can fail to correctly split
-        some tags. 
-        '''
+        ''' '''
         tags = [[] for i,_ in enumerate(sentences)]
         
         sents = {min(sent.token_idxs):sent for sent in sentences}
@@ -377,62 +335,50 @@ class NcbiDiseaseCorpus(Corpus):
                             
                     tags[i] += [ (label.text, (s_start,s_end)) ]
                     
-        return tags           
-
+        return tags    
+    
     def __iter__(self):
         for pmid in self.documents:
             yield self.__getitem__(pmid)
               
     def _load_files(self):
         '''
+        ChemDNER corpus format (tab delimited)
+        1- Article identifier (PMID)
+        2- Type of text from which the annotation was derived (T: Title, A: Abstract)
+        3- Start offset
+        4- End offset
+        5- Text string of the entity mention
+        6- Type of chemical entity mention (ABBREVIATION,FAMILY,FORMULA,IDENTIFIERS,MULTIPLE,SYSTEMATIC,TRIVIAL)
         '''
-        cvdefs = {"NCBIdevelopset_corpus.txt":"development",
-                  "NCBItestset_corpus.txt":"testing",
-                  "NCBItrainset_corpus.txt":"training"}
+        filelist = [(x,"%s%s.abstracts.txt" % (self.path,x)) for x in self.cv.keys()]
+        for cv,fname in filelist: 
+            docs = [d.strip().split("\t") for d in codecs.open(fname,"r",self.encoding).readlines()]
+            docs = {pmid:{"title":title,"body":body} for pmid,title,body in docs}
+            self.cv[cv] = {pmid:1 for pmid in docs} 
+            self.documents.update(docs)
         
-        filelist = glob.glob("%s/*.txt" % self.path)
-
-        for fname in filelist:
-            setname = cvdefs[fname.split("/")[-1]]
-            documents = []
-            with codecs.open(fname,"rU",self.encoding) as f:
-                doc = []
-                for line in f:
-                    row = line.strip()
-                    if not row and doc:
-                        documents += [doc]
-                        doc = []
-                    elif row:
-                        row = row.split("|") if (len(row.split("|")) > 1 and row.split("|")[1] in ["t","a"]) else row.split("\t")
-                        doc += [row]
-                documents += [doc]
-      
-            for doc in documents:
-                pmid,title,body = doc[0][0],doc[0][2],doc[1][2]
+        # load annotations
+        filelist = [(x,"%s%s.annotations.txt" % (self.path,x)) for x in self.cv.keys()]
+        
+        for cv,fname in filelist:
+            anno = [d.strip().split("\t") for d in codecs.open(fname,"r",self.encoding).readlines()]
+            for item in anno:
+                pmid, text_type, start, end, text, mention_type = item
+                start = int(start)
+                end = int(end)
                 
-                if pmid in self.documents:
-                    print "Warning: duplicate {} PMID {}".format(setname,pmid)
+                if pmid not in self.annotations:
+                    self.annotations[pmid] = []
+                
+                # FIX / HACK -- in order to match candidates correctly,
+                # we need sentence ids to increment properly. Parsing titles
+                # and abstract bodies separately breaks ids, so we offset
+                # body entities by the length of the title text
+                if text_type == "A":
+                    title_length = len(self.documents[pmid]["title"])
+                    start +=  title_length + 1
+                    end += title_length + 1
                     
-                self.cv[setname][pmid] = 1
-                self.documents[pmid] = {"title":title,"body":body}
-                doc_str = "%s %s" % (title, body)
-              
-                for row in doc[2:]:
-                    pmid, start, end, text, mention_type, duid = row
-                    start = int(start)
-                    end = int(end)
-                    # title or abstract mention?
-                    text_type = "T" if end <= len(title) else "A"
-                    if pmid not in self.annotations:
-                        self.annotations[pmid] = []
-                    
-                    label = Annotation(text_type, start, end, text, mention_type)
-                    self.annotations[pmid] += [label]
-            
-            # validate there are no duplicate annotations
-            labels = [ map(lambda x:(pmid,x), self.annotations[pmid]) for pmid in self.cv[setname]]
-            labels = list(itertools.chain.from_iterable(labels))
-      
-            print setname,len(labels)
-        
+                self.annotations[pmid] += [Annotation(text_type, start, end, text, mention_type)]
             

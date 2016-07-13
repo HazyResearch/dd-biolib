@@ -21,10 +21,10 @@ class DocParser(object):
           
     def __iter__(self):
         for fpath in self._get_files(self.inputpath):
-            for doc in self._parse_file(fpath):
+            for doc in self._load(fpath):
                 yield doc
     
-    def _parse_file(self, filename):
+    def _load(self, filename):
         raise NotImplementedError
 
     def _get_files(self, file_input):
@@ -45,7 +45,7 @@ class TextFileParser(DocParser):
         super(TextFileParser, self).__init__(inputpath, encoding)
         self.doc_id_func = self._filename2uid if not doc_id_func else doc_id_func
     
-    def _parse_file(self, filename):
+    def _load(self, filename):
         uid = self.doc_id_func(filename)
         text = u''.join(codecs.open(filename,"rU",self.encoding).readlines())
         yield Document(doc_id=uid, text=text)
@@ -61,7 +61,7 @@ class RowParser(DocParser):
         self.delimiter = delimiter
         self.text_columns = text_columns
         
-    def _parse_file(self, filename):
+    def _load(self, filename):
         with codecs.open(filename,"rU",self.encoding) as f:
             for i,line in enumerate(f):
                 row = line.split(self.delimiter)
