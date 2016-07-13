@@ -382,7 +382,10 @@ class NcbiDiseaseCorpus(Corpus):
     def __iter__(self):
         for pmid in self.documents:
             yield self.__getitem__(pmid)
-              
+    
+    
+    
+    
     def _load_files(self):
         '''
         '''
@@ -412,7 +415,10 @@ class NcbiDiseaseCorpus(Corpus):
                 
                 if pmid in self.documents:
                     print "Warning: duplicate {} PMID {}".format(setname,pmid)
-                    
+                
+                
+                
+                
                 self.cv[setname][pmid] = 1
                 self.documents[pmid] = {"title":title,"body":body}
                 doc_str = "%s %s" % (title, body)

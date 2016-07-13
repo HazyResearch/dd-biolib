@@ -81,7 +81,7 @@ class HackDictionaryMatcher(RegexNgramMatch):
 
 
 class NounPhraseMatcher(CandidateExtractor):
-    
+    """ Match Noun Phrases, L/R stripped of DTs and CCs"""
     def init(self):
         self.pattern = re.compile("(NN[SP]*|JJ[S]*|DT|CC)") 
         self.label         = self.opts['label']
@@ -90,7 +90,6 @@ class NounPhraseMatcher(CandidateExtractor):
         self.longest_match = self.opts.get('longest_match', True) 
        
     def _apply(self, s, idxs=None):
-        
         noun_phrases = []
         np = []
         for i,tag in enumerate(s.poses):
@@ -100,21 +99,14 @@ class NounPhraseMatcher(CandidateExtractor):
                 noun_phrases += [np]
                 np = []
          
-        for np in noun_phrases:
-            
+        for np in noun_phrases:   
             while np and re.search("(CC|[PW]*DT)",np[0][1]):
-                np.pop(0)
-                
+                np.pop(0)      
             while np and re.search("(CC|[PW]*DT)",np[-1][1]):
-                np.pop()
-            
+                np.pop()   
             if not np or re.search("JJ[RS]*",np[0][1]):
                 continue
-            
             idxs,poses = zip(*np)
-            
-            #print np, s.words[min(idxs):max(idxs)+1]
-            #print "----"
             yield list(idxs), 'x'
         
       

@@ -14,8 +14,8 @@ import bz2
 import sys
 import glob
 import codecs
-from utils import database
 import subprocess
+from utils import database
 from functools import partial
 from collections import defaultdict
 from config import DEFAULT_UMLS_CONFIG
@@ -48,7 +48,6 @@ def build_umls_dictionaries(config,min_occur=50):
     sql = "".join(open(sql_tmpl,"rU").readlines())
     
     results = conn.query(sql)
-    #abbrv,terms = {},{}
     abbrv = defaultdict(partial(defaultdict, defaultdict))
     terms = defaultdict(partial(defaultdict, defaultdict))
     
@@ -56,20 +55,8 @@ def build_umls_dictionaries(config,min_occur=50):
         text,sty,sab,tty = row
         sty = sty.lower().replace(" ","_")
         if tty in abbrv_tty:
-            '''
-            if sty not in abbrv:
-                abbrv[sty] = {}
-            if sab not in abbrv[sty]:
-                abbrv[sty][sab] = {}
-            '''
             abbrv[sty][sab][text] = 1
         elif tty not in not_term_tty:
-            '''
-            if sty not in terms:
-                terms[sty] = {}
-            if sab not in terms[sty]:
-                terms[sty][sab] = {}
-            '''
             terms[sty][sab][text.lower()] = 1
             
     for sty in abbrv:

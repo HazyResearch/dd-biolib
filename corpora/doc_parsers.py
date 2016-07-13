@@ -3,6 +3,7 @@ import glob
 import codecs
 
 class Document(object):
+    ''' '''
     def __init__(self, doc_id, text, sentences=[], attributes={}, annotations=[]):
         self.doc_id = doc_id
         self.text = text
@@ -11,10 +12,11 @@ class Document(object):
         self.attributes = attributes
         
     def __repr__(self):
-        return "Document [{}] {}...".format(self.doc_id,self.text[0:10])
+        return "Document ID={} {}...".format(self.doc_id,self.text[0:10])
         
                 
 class DocParser(object):
+    ''' '''
     def __init__(self, inputpath, encoding="utf-8"):
         self.inputpath = inputpath
         self.encoding=encoding
@@ -24,7 +26,7 @@ class DocParser(object):
             for doc in self._load(fpath):
                 yield doc
     
-    def _load(self, filename):
+    def _load(self, source):
         raise NotImplementedError
 
     def _get_files(self, file_input):
@@ -45,9 +47,9 @@ class TextFileParser(DocParser):
         super(TextFileParser, self).__init__(inputpath, encoding)
         self.doc_id_func = self._filename2uid if not doc_id_func else doc_id_func
     
-    def _load(self, filename):
-        uid = self.doc_id_func(filename)
-        text = u''.join(codecs.open(filename,"rU",self.encoding).readlines())
+    def _load(self, source):
+        uid = self.doc_id_func(source)
+        text = u''.join(codecs.open(source,"rU",self.encoding).readlines())
         yield Document(doc_id=uid, text=text)
 
 
@@ -61,8 +63,8 @@ class RowParser(DocParser):
         self.delimiter = delimiter
         self.text_columns = text_columns
         
-    def _load(self, filename):
-        with codecs.open(filename,"rU",self.encoding) as f:
+    def _load(self, source):
+        with codecs.open(source,"rU",self.encoding) as f:
             for i,line in enumerate(f):
                 row = line.split(self.delimiter)
                 if i == 0 and self.header:

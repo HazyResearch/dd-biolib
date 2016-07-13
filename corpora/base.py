@@ -2,13 +2,11 @@ from .doc_parsers import TextFileParser
     
 class Corpus(object):
     '''Simple iterator class for loading and parsing documents'''
-    def __init__(self, doc_parser, text_parser=None, 
-                 attributes={}, encoding="utf-8"):
+    def __init__(self, doc_parser, text_parser=None, attributes={}):
         self.doc_parser = doc_parser
         self.text_parser = text_parser
         self.attributes = attributes
-        self.encoding = encoding
-    
+        
     def __getitem__(self,key):
         raise ValueError("Indexing not supported, use IndexedCorpus or DatabaseCorpus")
         
