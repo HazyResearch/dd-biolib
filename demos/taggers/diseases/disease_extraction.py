@@ -209,14 +209,15 @@ prefixes = DictionaryMatch(label="prefixes",d=['deficiency of',"inherited"],
 deficiency_of = Concat(prefixes,stem_forms)
 
 # sex_linked
-gene_linked = DictionaryMatch(label="x-linked", d=["x-linked","x linked","x linked recessive",
+gene_linked = DictionaryMatch(label="x-linked", d=["x-linked","x linked","x linked recessive","semidominant",
+                                                   "hereditary",
                                                    "recessive","x-linked recessive", "x-linked dominant",
                                                    "dominant",'autosomal recessive',"autosomal dominant",
                                                    "autossomal recessive"],
                             ignore_case=True, longest_match=longest_match)
 gene_linked = Concat(gene_linked,stem_forms)
 
-cancers = RegexMatchSpan(label="cancers",rgx="(^[A-Za-z]+ (and|and/or|or) [A-Za-z]+ cancer[s]*$)|(^[A-Za-z]+[\-][A-Za-z]+ cancer[s]*$)")
+cancers = RegexMatchSpan(label="cancers",rgx="(^[A-Za-z]+ (and|and/or|or) [A-Za-z]+ cancer[s]*$)|(^[A-Za-z]+[\/-][A-Za-z]+ cancer[s]*$)")
 deficient = RegexMatchSpan(label="deficient",rgx="^[A-Za-z0-9]+[-]deficient$")
 
 
