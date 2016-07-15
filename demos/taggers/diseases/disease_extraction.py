@@ -7,7 +7,7 @@ import numpy as np
 from ddlite import *
 from ddlite_candidates import Candidates
 from ddlite_candidates import Ngrams,Ngram
-from ddlite_matchers import DictionaryMatch,Union,Concat
+from ddlite_matchers import DictionaryMatch,Union,Concat,RegexMatchSpan
 
 from datasets import ncbi_disease
 from versioning import CandidateVersioner
@@ -17,6 +17,40 @@ from ontologies.bioportal import load_bioportal_csv_dictionary
 from tools import load_disease_dictionary,load_acronym_dictionary
 
 from matchers import NcbiDiseaseDictionaryMatch
+
+common_disease_acronyms = ["AAPC", "AAS", "ABCD syndrome", "ACC", "ACS", "ACTH deficiency", "AD", "AD", "ADD",
+                           "ADD-RT", "ADEM", "ADHD", "AF", "AGS", "AHC", "AIDS", "AIP", "ALA DD", "ALI", "ALS",
+                           "AMD", "AOS", "APA", "APS", "ARBD", "ARD", "ARDS", "Acute respiratory distress syndrome",
+                           "ARND", "AS", "ASD", "ASDs", "A-T", "AVMs", "B-NHL", "BBS", "BEB", "BD", "BEH", "BFIC", "BH", "BMD", "BPD",
+                           "BPH", "BS", "BSE", "BSS", "BV", "CACH", "CAD", "CADSIL", "CAPD", "CCD", "CCHF", "CCHS",
+                           "CCM", "CDG", "CDGS", "CEP", "CES", "CESD", "CF", "CFIDS", "CFS", "CGBD", "CHD", "CHF", "CHS"
+                           "CIDP", "CIPA", "CJD", "CLD", "COFS", "COPD", "CP", "CP/CPPS", "CPDD", "CPM", "CPPS", "CRF",
+                           "CRKP", "CRPS", "CSA", "CSD", "CVD", "DAS", "DBA", "DBMD", "DD", "DEF", "DF", "DH",
+                           "DHF", "DiG", "DLB", "DM", "DMD", "DP", "DRSP disease", "DS", "DSPS", "DTs", "DVD",
+                           "DVT", "ED", "EDS", "EEE", "EHK", "EMH", "EMR", "ENS", "EPM", "EPP", "ESRD", "ESS", "EVA"
+                           "FAE", "FASDs", "FFI", "FMA", "FMD", "FMF", "FMS", "FNDI", "FSP", "FTD", "FVS", "FXS", 
+                           "GAD", "GAN", "GAS disease", "GBS", "GBS disease", "GCE", "GERD", "GI", "GIB", "GN",
+                           "GRMD", "GSS disease", "GT/LD", "GVHD", "GWD", "HAS", "HBL", "HCP", "HD", "HDL2", "HEELP syndrome",
+                           "HFA", "HFMD", "HFRS", "HI", "HiB disease", "HMSN Type III", "HMS", "HOH", "HTN",
+                           "HPRT deficiency", "HPS", "HPV Infection", "HSP", "IBD", "IBIDS syndrome", "IBM",
+                           "IBS", "IBS", "IC/PBS", "ICF syndrome", "IDMS", "IHA", "IED", "IFAP syndrome", "INAD", "IP",
+                           "IRD", "IS", "ITP", "JAS", "JE", "JHD", "JRA", "JT", "KS", "KSS", "KTW Syndrome",
+                           "LCM", "LEMS", "LFA", "LGV", "LKS", "LNS", "LP", "MAC", "MBD", "MCS", "MD",
+                           "MDD", "MDR TB", "MEF", "MHP", "MID", "MJD", "ML", "MLD", "MMA", "MMR", "MMRV", "MND", "MOH", "MPD",
+                           "MPS I", "MPS II", "MPS III", "MPS IV", "MPS VI", "MPS VII", "MR/DD", "MS", "MSA",
+                           "MSDD", "NAS", "NBIA", "NCL", "NF1", "NF2", "NKH", "NLD", "NMDs", "NMO", "NMS", "NP",
+                           "NPC1", "NPH", "NTD", "NTDs", "OA", "OCD", "ODD", "OMA", "ON", "OPC", "OPCA", "OSA",
+                           "PBC", "PBD", "PCOS", "PCT", "PDD", "PDD-NOS", "PDD/NOS", "PKAN", "PLMD", "PLS",
+                           "PMD", "PML", "PMS", "POTS", "PPMA", "PPS", "PSC", "PSP", "PVL", "PW", "Q fever", "RA",
+                           "RAD", "RIND", "RLF", "RLS", "RMDs", "ROP", "RS", "RSD", "RTI", "SARS", "SB", "SBS", "SC",
+                           "SIDS", "SIS", "SLE", "SM", "SMA", "SMEI", "SMS", "SOD", "SPS", "SSPE", "STEMI",
+                           "STD", "SUNCT", "SWS", "TAC", "TB", "TBI", "TCD", "TCS", "TEF", "TIA", "TMH", "TMJ/TMD", "TMR",
+                           "TN", "TOS", "TS", "TS", "TSC", "TSEs", "TSP", "TTH", "TTP", "UCPPS", "UDA", "UTIs", "UC",
+                           "URI", "VCFS", "vCJD", "VD", "VHF", "VP", "VSD", "VVC", "VWM disease",
+                           "WAGR syndrome", "WD", "WEE", "WFS", "WS", "XLT", "XDR TB", "XLDCM", "XLSA", "XP", "YSS", "YVS", 
+                           "ZBLS", "SCA1", "SCA2", "C1D", "C3D", "C4D", "C5D", "C6D", "C7D", "CCALD", "CL/P",
+                           "SJS type 2"]
+
 
 def clean_dictionary(d,stopwords,ignore_case=True):
     '''Remove some stopwords'''
@@ -33,7 +67,7 @@ def get_stopwords():
     
     dictfile = "dicts/cell_molecular_dysfunction.txt"
     stopwords = dict.fromkeys([line.strip().split("\t")[0].lower() for line in open(dictfile).readlines()])
-    
+    #stopwords = {}
     dictfile = "dicts/umls_geographic_areas.txt"
     terms = [line.strip().split("\t")[0].lower() for line in open(dictfile).readlines()]
     stopwords.update(dict.fromkeys(terms))
@@ -118,11 +152,12 @@ umls_abbrv = UmlsNoiseAwareDict(positive=positive, name="abbrvs", ignore_case=Fa
 #umls_stopwords = UmlsNoiseAwareDict(negative=negative, name="terms", ignore_case=True)
 
 diseases = umls_terms.dictionary() # create stand alone dictionaries
-abbrvs = umls_abbrv.dictionary()
+#abbrvs = umls_abbrv.dictionary()
 #stopwords = umls_stopwords.dictionary()
 
 #diseases = load_disease_dictionary()
-#abbrvs = load_acronym_dictionary()
+abbrvs = load_acronym_dictionary()
+abbrvs.update(dict.fromkeys(common_disease_acronyms))
 
 # Load various other disease ontologies
 ordo = load_bioportal_csv_dictionary("dicts/ordo.csv")
@@ -165,7 +200,8 @@ types = DictionaryMatch(label="prefixes", d=['type', 'class', 'stage', 'factor']
                         ignore_case=True, longest_match=longest_match)
 type_nums = DictionaryMatch(label="prefixes", d=['i', 'ii', 'iii', 'vi', 'v', 'vi', '1a', 'iid', 'a', 'b', 'c', 'd'] + digits,
                             ignore_case=True, longest_match=longest_match)
-disease_types = Concat(stem_forms, Concat(types,type_nums))
+disease_types_right = Concat(stem_forms, Concat(types,type_nums))
+disease_types_left = Concat(Concat(types,type_nums),stem_forms)
 
 # deficiency of
 prefixes = DictionaryMatch(label="prefixes",d=['deficiency of',"inherited"],
@@ -173,22 +209,21 @@ prefixes = DictionaryMatch(label="prefixes",d=['deficiency of',"inherited"],
 deficiency_of = Concat(prefixes,stem_forms)
 
 # sex_linked
-x_linked = DictionaryMatch(label="x-linked", d=["x-linked"],
+gene_linked = DictionaryMatch(label="x-linked", d=["x-linked","x linked","x linked recessive",
+                                                   "recessive","x-linked recessive", "x-linked dominant",
+                                                   "dominant",'autosomal recessive',"autosomal dominant",
+                                                   "autossomal recessive"],
                             ignore_case=True, longest_match=longest_match)
-sex_linked = Concat(x_linked,stem_forms)
+gene_linked = Concat(gene_linked,stem_forms)
+
+cancers = RegexMatchSpan(label="cancers",rgx="(^[A-Za-z]+ (and|and/or|or) [A-Za-z]+ cancer[s]*$)|(^[A-Za-z]+[\-][A-Za-z]+ cancer[s]*$)")
+deficient = RegexMatchSpan(label="deficient",rgx="^[A-Za-z0-9]+[-]deficient$")
 
 
+matcher = Union(dict_diseases, dict_abbrvs, disease_deficiency, deficient, cancers,
+                disease_types_left, disease_types_right, deficiency_of, gene_linked)
 
-
-matcher = Union(disease_deficiency,
-                disease_types, deficiency_of, sex_linked)
-
-#dict_diseases, dict_abbrvs, 
-
-#matcher = Union(dict_diseases, dict_abbrvs)
-
-
-holdouts = ["training"]#,"development","testing"]
+holdouts = ["training","development"]#,"testing"]
 for setname in holdouts:
     
     doc_ids = corpus.attributes["sets"][setname]
@@ -205,9 +240,17 @@ for setname in holdouts:
     
     cs.gold_stats(gold)
     
-    for c in candidates:
-        print(c)
+    fn = []
+    for c in gold:
+        if c not in candidates:
+            fn += [c.get_span()]
     
+    fn = {term:fn.count(term) for term in set(fn)}
+    for item in sorted(fn.items(),key=lambda x:x[1],reverse=0):
+        print(item)
+    
+    #for c in candidates:
+    #    print(c)
     '''
     for label in gold:
         if label not in candidates:
