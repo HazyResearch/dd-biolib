@@ -85,14 +85,14 @@ class UmlsNoiseAwareDict(object):
     '''Use UMLS semantic types and source vocabulary information
     to create labeling functions for providing supervision for 
     tagging tasks'''
-    def __init__(self, positive=[], negative=[], prefix="",
+    def __init__(self, positive=[], negative=[], name="",
                  rootdir=None, ignore_case=True):
         
         module_path = os.path.dirname(__file__)
-        self.rootdir = rootdir if rootdir else "{}/data/cache/{}/".format(module_path,prefix)
+        self.rootdir = rootdir if rootdir else "{}/data/cache/{}/".format(module_path,name)
         self.positive = [self._norm_sty_name(x) for x in positive]
         self.negative = [self._norm_sty_name(x) for x in negative]
-        self.prefix = prefix
+        self.name = name
         self.encoding = "utf-8"
         self.ignore_case = ignore_case
         self._dictionary = self._load_dictionaries()
@@ -105,7 +105,6 @@ class UmlsNoiseAwareDict(object):
         entity examples'''
         d = defaultdict(defaultdict)
         filelist = glob.glob("{}*.txt.bz2".format(self.rootdir))
-        
         for fpath in filelist:
             fname = fpath.split("/")[-1].rstrip(".txt.bz2")
             i = fname.index(".")
@@ -144,7 +143,7 @@ class UmlsNoiseAwareDict(object):
         for sty in self._dictionary:
             for sab in self._dictionary[sty]:
                 label = "pos" if sty in self.positive else "neg"
-                prefix = "{}_".format(self.prefix) if self.prefix else ""
+                prefix = "{}_".format(self.name) if self.name else ""
                 func_name = "LF_{}{}_{}_{}".format(prefix,sty,sab,label)
                 rvalue = 1 if label=="pos" else -1
                 yield dict_function_factory(self._dictionary[sty][sab],rvalue,

@@ -18,9 +18,35 @@ from tools import load_disease_dictionary,load_acronym_dictionary
 
 from matchers import NcbiDiseaseDictionaryMatch
 
-def clean_dictionary(d):
+def clean_dictionary(d,stopwords,ignore_case=True):
     '''Remove some stopwords'''
-    pass
+    rm = []
+    for term in d:
+        t = term.lower() if ignore_case else term
+        if t in stopwords:
+            rm += [term]
+            
+    for t in rm:
+        del d[t]
+
+def get_stopwords():
+    
+    dictfile = "dicts/cell_molecular_dysfunction.txt"
+    stopwords = dict.fromkeys([line.strip().split("\t")[0].lower() for line in open(dictfile).readlines()])
+    
+    dictfile = "dicts/umls_geographic_areas.txt"
+    terms = [line.strip().split("\t")[0].lower() for line in open(dictfile).readlines()]
+    stopwords.update(dict.fromkeys(terms))
+    
+    dictfile = "dicts/stopwords.txt"
+    terms = [line.strip().split("\t")[0].lower() for line in open(dictfile).readlines()]
+    stopwords.update(dict.fromkeys(terms))
+    
+    stopwords[""] = 1
+    stopwords["a"] = 1
+    
+    return stopwords
+
 
 def get_gold_labels(corpus,doc_ids=None):
     '''Generate gold labels for the provided corpus. Note: requires an "annotations"
@@ -75,17 +101,28 @@ positive = ["Acquired Abnormality",
             "Pathologic Function",
             "Sign or Symptom"]
 
-umls_terms = UmlsNoiseAwareDict(positive=positive, prefix="terms", ignore_case=False)
-umls_abbrv = UmlsNoiseAwareDict(positive=positive, prefix="abbrvs", ignore_case=False)
+negative = ["Physiologic Function","Molecular Function","Genetic Function",
+            "Cell Function","Organ or Tissue Function","Organism Function", "Food",
+            "Mental Process","Molecular Sequence","Nucleotide Sequence", "Animal",
+            "Carbohydrate Sequence","Amino Acid Sequence","Body Substance",
+            "Cell","Gene or Genome","Cell Component","Functional Concept",
+            "Spatial Concept","Molecular Biology Research Technique",
+            "Laboratory or Test Result","Laboratory or Test Result",
+            "Animal","Therapeutic or Preventive Procedure","Bacterium","Phenomenon or Process",
+            "Quantitative Concept","Temporal Concept","Natural Phenomenon or Process",
+            "Body Part, Organ, or Organ Component","Body Location or Region",
+            "Body Space or Junction", "Pathologic Function"]
 
-#diseases = umls_terms.dictionary() # create stand alone dictionaries
-#abbrvs = umls_abbrv.dictionary()
+umls_terms = UmlsNoiseAwareDict(positive=positive, name="terms", ignore_case=False)
+umls_abbrv = UmlsNoiseAwareDict(positive=positive, name="abbrvs", ignore_case=False)
+#umls_stopwords = UmlsNoiseAwareDict(negative=negative, name="terms", ignore_case=True)
 
-diseases = load_disease_dictionary()
-abbrvs = load_acronym_dictionary()
+diseases = umls_terms.dictionary() # create stand alone dictionaries
+abbrvs = umls_abbrv.dictionary()
+#stopwords = umls_stopwords.dictionary()
 
-if "A" in diseases:
-    del diseases["A"]
+#diseases = load_disease_dictionary()
+#abbrvs = load_acronym_dictionary()
 
 # Load various other disease ontologies
 ordo = load_bioportal_csv_dictionary("dicts/ordo.csv")
@@ -95,6 +132,7 @@ ctd = load_ctd_dictionary("dicts/CTD_diseases.tsv") # CTD's MEDIC disease vocabu
 diseases.update(ordo)
 diseases.update(doid)
 diseases.update(ctd)
+clean_dictionary(diseases,get_stopwords())
 
 print("DICTIONARY Disease Terms: {}".format(len(diseases)))
 print("DICTIONARY Abbreviation/Acronym Terms: {}".format(len(abbrvs)))
@@ -112,6 +150,7 @@ dict_diseases = DictionaryMatch(label='disease', d=diseases,
 dict_abbrvs = DictionaryMatch(label='disease_acronyms', d=abbrvs, 
                             ignore_case=False, longest_match=longest_match)
 
+
 stem_forms = DictionaryMatch(label='disease_stems', d=dict.fromkeys(diseases.keys() + abbrvs.keys()),
                              ignore_case=False, longest_match=longest_match)
 
@@ -121,7 +160,7 @@ suffixes = DictionaryMatch(label="prefixes", d=['deficiency', 'deficient', 'defi
 disease_deficiency = Concat(stem_forms, suffixes)
 
 # disease types 
-digits = map(unicode,range(1,20))
+digits = map(unicode,range(1,10))
 types = DictionaryMatch(label="prefixes", d=['type', 'class', 'stage', 'factor'],
                         ignore_case=True, longest_match=longest_match)
 type_nums = DictionaryMatch(label="prefixes", d=['i', 'ii', 'iii', 'vi', 'v', 'vi', '1a', 'iid', 'a', 'b', 'c', 'd'] + digits,
@@ -133,14 +172,23 @@ prefixes = DictionaryMatch(label="prefixes",d=['deficiency of',"inherited"],
                            ignore_case=True, longest_match=longest_match)
 deficiency_of = Concat(prefixes,stem_forms)
 
+# sex_linked
+x_linked = DictionaryMatch(label="x-linked", d=["x-linked"],
+                            ignore_case=True, longest_match=longest_match)
+sex_linked = Concat(x_linked,stem_forms)
 
-matcher = Union(dict_diseases, dict_abbrvs, disease_deficiency,
-                disease_types, deficiency_of)
-
-matcher = Union(dict_diseases, dict_abbrvs)
 
 
-holdouts = ["training","development","testing"]
+
+matcher = Union(disease_deficiency,
+                disease_types, deficiency_of, sex_linked)
+
+#dict_diseases, dict_abbrvs, 
+
+#matcher = Union(dict_diseases, dict_abbrvs)
+
+
+holdouts = ["training"]#,"development","testing"]
 for setname in holdouts:
     
     doc_ids = corpus.attributes["sets"][setname]
@@ -156,13 +204,14 @@ for setname in holdouts:
     print("%d Candidates" % len(candidates)) 
     
     cs.gold_stats(gold)
-    '''
-    for label in gold:
-        if "type" in label.get_span().lower():
-            print("*",label)
     
     for c in candidates:
         print(c)
+    
+    '''
+    for label in gold:
+        if label not in candidates:
+            print(label.get_span(), label.get_span().lower() in diseases)
     '''
 sys.exit()
 
