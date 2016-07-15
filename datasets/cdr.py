@@ -218,6 +218,33 @@ class CdrCorpus(Corpus):
         txt = " ".join(c.mention())
         char_span = [c.token_idxs[i] for i in c.idxs]
         char_span = (min(char_span),min(char_span)+len(txt))
+        cnt = 0
+        for i in c.mention():
+            if i.startswith("'"):
+                cnt=cnt+1
+        char_span = (min(char_span),min(char_span)+len(txt) - cnt)
+
+        suffix = ['-binding', '-independent', '-attributed', '-exposed', '-devoid', '-containing', '-icv', '-reperfusion', 
+                  '-sensitive', '-induce', '-depleting', '-only', '-labeled', '-elicited', '-produced', '-resistant', 
+                  '-maintenance', '-adducted', '-like', '-mediated', '-highly', '-iduced', '-synthesis', '-loading', 
+                  '-polydrug', '-enhanced', '-specific', '-evoked', '-channel', '-maintained', '-releasing', '-lesion', 
+                  '-controlled', '-degrading', '-stimulated', '-allergic', '-therapy', '-uptake', '-based', '-associated', 
+                  '-iron', '-urethane', '-injected', '-abusing', '-refractory', '-converting', '-bearing', '-induced', 
+                  '-anesthetized', '-suppressible', '-synthesizing', '-type', '-treated', '-supplemented', '-dependent', 
+                  '-kindled', '-conserving', '-angioedema', '-stained', '-activated', '-related', '-deficient', '-depleted', 
+                  '-free', '-altered', '-dominant', '-exposure', '-derived', '-lesioned', '-rich', '-pretreated', 
+                  '-testosterone', '-aggravated', '-infused', '-initiated', '-untreated', '-resistance', '-responsive', 
+                  '-loaded', '-response']
+
+        txt = " ".join(c.mention())
+        l = 0
+        for i in suffix:
+            if txt.endswith(i):
+                l = len(i)
+        if l > 0:
+            char_span = (min(char_span),min(char_span)+len(txt)-l)
+            return (c.doc_id, c.sent_id, tuple(c.idxs), char_span, "".join(c.mention())[:-l])
+#        print (c.doc_id, c.sent_id, tuple(c.idxs), char_span, "".join(c.mention()))
         return (c.doc_id, c.sent_id, tuple(c.idxs), char_span, "".join(c.mention()))
         #return (c.doc_id, c.sent_id, tuple(c.idxs), "".join(c.mention()))
     
