@@ -11,8 +11,6 @@ def download(url,outfname):
     except URLError, e:
         print "URL Error:", e.reason, url
 
-
-
 def unescape_penn_treebank(words):
     '''Replace PennTreeBank tags and other CoreNLP modifications. This is
     pretty much a hack. '''

@@ -14,6 +14,7 @@ import bz2
 import sys
 import glob
 import codecs
+import itertools
 import subprocess
 from utils import database
 from functools import partial
@@ -88,24 +89,23 @@ class UmlsNoiseAwareDict(object):
                  rootdir=None, ignore_case=True):
         
         module_path = os.path.dirname(__file__)
-        self.rootdir = rootdir if rootdir else "{}/data/cache/".format(module_path)
-            
+        self.rootdir = rootdir if rootdir else "{}/data/cache/{}/".format(module_path,prefix)
         self.positive = [self._norm_sty_name(x) for x in positive]
         self.negative = [self._norm_sty_name(x) for x in negative]
         self.prefix = prefix
         self.encoding = "utf-8"
         self.ignore_case = ignore_case
-        self.dictionary = self._load_dictionaries()
+        self._dictionary = self._load_dictionaries()
         
     def _norm_sty_name(self,s):
         return s.lower().replace(" ","_")
     
     def _load_dictionaries(self):
-        '''Load dictionaries base on provided postive/negative 
+        '''Load dictionaries base on provided positive/negative 
         entity examples'''
         d = defaultdict(defaultdict)
         filelist = glob.glob("{}*.txt.bz2".format(self.rootdir))
-    
+        
         for fpath in filelist:
             fname = fpath.split("/")[-1].rstrip(".txt.bz2")
             i = fname.index(".")
@@ -124,16 +124,30 @@ class UmlsNoiseAwareDict(object):
             d[sty][sab] = dict.fromkeys(terms)
             
         return d    
-                
+    
+    def dictionary(self,semantic_types=None,source_vocab=None):
+        '''Create a single dictionary building using the provided semantic types
+        and source vocabularies. If either are None, use all available types. 
+        '''
+        semantic_types = self._dictionary if not semantic_types else semantic_types
+        sabs = list(itertools.chain.from_iterable([self._dictionary[sty].keys() for sty in self._dictionary]))
+        source_vocab = dict.fromkeys(sabs) if not source_vocab else source_vocab    
+          
+        d = [[self._dictionary[sty][sab].keys() for sab in self._dictionary[sty] if sab in source_vocab] 
+             for sty in self._dictionary if sty in semantic_types]
+ 
+        d = map(lambda x:list(itertools.chain.from_iterable(x)),d)
+        return dict.fromkeys(itertools.chain.from_iterable(d))
+        
     def lfs(self):
         '''Create labeling functions for each semantic type/source vocabulary'''
-        for sty in self.dictionary:
-            for sab in self.dictionary[sty]:
+        for sty in self._dictionary:
+            for sab in self._dictionary[sty]:
                 label = "pos" if sty in self.positive else "neg"
                 prefix = "{}_".format(self.prefix) if self.prefix else ""
                 func_name = "LF_{}{}_{}_{}".format(prefix,sty,sab,label)
                 rvalue = 1 if label=="pos" else -1
-                yield dict_function_factory(self.dictionary[sty][sab],rvalue,
+                yield dict_function_factory(self._dictionary[sty][sab],rvalue,
                                             func_name,self.ignore_case)
                 
 

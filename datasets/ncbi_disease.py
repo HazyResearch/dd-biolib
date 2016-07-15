@@ -11,8 +11,7 @@ class NcbiDiseaseParser(DocParser):
     '''
     The NCBI disease corpus is fully annotated at the mention and concept level 
     to serve as a research resource for the biomedical natural language processing 
-    community. 
-                    -- from http://www.ncbi.nlm.nih.gov/CBBresearch/Dogan/DISEASE/
+    community.     -- from http://www.ncbi.nlm.nih.gov/CBBresearch/Dogan/DISEASE/
                     
         793 PubMed abstracts
         6,892 disease mentions
@@ -74,24 +73,25 @@ class NcbiDiseaseParser(DocParser):
                 pmid,title,abstract = doc[0][0],doc[0][2],doc[1][2]
                 text = "%s %s" % (title, abstract)
                 attributes = {"set":setname,"title":title,"abstract":abstract}            
-                annotations = []
+                attributes["annotations"] = []
                 
                 # load annotation tuples
                 for row in doc[2:]:
-                    pmid, start, end, text, mention_type, duid = row
+                    pmid, start, end, mention, mention_type, duid = row
                     start,end = int(start),int(end)
                     text_type = "T" if end <= len(title) else "A" 
-                    label = Annotation(text_type, start, end, text, mention_type)
-                    annotations += [label]
+                    label = Annotation(text_type, start, end, mention, mention_type)
+                    attributes["annotations"] += [label]
 
-                doc  = Document(pmid,text,attributes=attributes,
-                                annotations=annotations)
+                doc = Document(pmid,text,attributes=attributes)
                 self._docs[pmid] = doc
-                
+    
+    def __getitem__(self,key):
+        return self._docs[key]
+    
     def _load(self, filename):
         for pmid in self._docs:
             yield self._docs[pmid]
-
 
 
 def load_corpus():
@@ -101,6 +101,7 @@ def load_corpus():
     cache_dir = "{}/data/ncbi_disease_corpus/cache/".format(os.path.dirname(__file__))
     doc_parser = NcbiDiseaseParser()
     text_parser = PickleSerializedParser(CoreNlpParser(),rootdir=cache_dir)
+    
     # create cross-validation set information
     attributes = {"sets":{"testing":[],"training":[],"development":[]}}
     for pmid in doc_parser._docs:
@@ -109,5 +110,4 @@ def load_corpus():
       
     return Corpus(doc_parser,text_parser,attributes)
 
-#http://ctdbase.org/downloads/;jsessionid=225E0E61ADABE59AC052E0FF6B088217#alldiseases
-#http://ctdbase.org/reports/CTD_diseases.tsv.gz
+

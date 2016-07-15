@@ -4,15 +4,14 @@ import codecs
 
 class Document(object):
     ''' '''
-    def __init__(self, doc_id, text, sentences=[], attributes={}, annotations=[]):
+    def __init__(self, doc_id, text, sentences=[], attributes={}):
         self.doc_id = doc_id
         self.text = text
         self.sentences = sentences
-        self.annotations = annotations
         self.attributes = attributes
         
     def __repr__(self):
-        return "Document ID={} {}...".format(self.doc_id,self.text[0:10])
+        return "<Document(id={} text={}...)>".format(self.doc_id,self.text[0:50])
         
                 
 class DocParser(object):
@@ -25,6 +24,9 @@ class DocParser(object):
         for fpath in self._get_files(self.inputpath):
             for doc in self._load(fpath):
                 yield doc
+
+    def __getitem__(self,key):
+        raise NotImplementedError    
     
     def _load(self, source):
         raise NotImplementedError
