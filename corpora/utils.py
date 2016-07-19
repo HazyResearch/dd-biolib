@@ -50,5 +50,9 @@ def kill_gremlins(text):
             # make sure we have a unicode string
             text = unicode(text, "iso-8859-1")
         text = re.sub(u"[\x80-\x9f]", fixup, text)
+        # remove ASCII control chars
     return text
 
+def rm_ascii_control_chars(t):
+    return re.sub(u"[\x00-\x1F]|[\x7F]", u"", t)
+    

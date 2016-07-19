@@ -1,6 +1,8 @@
+import glob
 import hashlib
-from datetime import datetime
+import cPickle
 from ddlite import Relations
+from datetime import datetime
 
 def dict2str(d):
     '''Convert dictionary to tuple pair string'''
@@ -19,8 +21,8 @@ def checksum(s):
 def cands2str(candidates):
     '''Convert DeepDive Relations object to string'''
     convert = lambda x:x.encode("utf-8",errors="ignore")
-    rela_func = lambda x:["{}:{}".format(x.doc_id, x.sent_id)] + map(convert,x.mention1("words")) + map(convert,x.mention2("words"))
-    entity_func = lambda x:["{}:{}".format(x.doc_id, x.sent_id)] + map(convert,x.mention("words"))
+    rela_func = lambda x:["{}:{}".format(x.sentence["doc_id"], x.sentence["sent_id"])] + map(convert,x.mention1("words")) + map(convert,x.mention2("words"))
+    entity_func = lambda x:["{}:{}".format(x.sentence["doc_id"], x.sentence["sent_id"])] + map(convert,x.get_span())
     get_row = rela_func if type(candidates) is Relations else entity_func
     # create string versions of candidates
     s = [":".join(get_row(c)) for c in candidates]
@@ -33,8 +35,9 @@ class CandidateVersioner(object):
         self.rootdir = rootdir
         self.prefix = prefix
         self.filename = None
-    
-    def dump_candidates(self, candidates, dicts):
+        self.checksum = None
+        
+    def save(self, candidates, dicts):
         '''Save checksummed version of candidate set. This computes
         checksums based on dictionaries, input documents, and final
         candidate set'''
@@ -43,9 +46,19 @@ class CandidateVersioner(object):
         ctype = "RELATIONS." if type(candidates) is Relations else "ENTITIES."
         prefix = self.prefix + "." if self.prefix else ""
         self.filename = "{}/{}{}{}".format(self.rootdir,prefix,ctype,manifest["uid"])
-        candidates.dump_candidates("{}.pkl".format(self.filename))
+        
+        cPickle.dump(candidates, open("{}.pkl".format(self.filename),"w"))
         self._write_log(self.filename,manifest)
+        self.checksum = manifest["uid"]
     
+    
+    def load(self,checksum):
+        filelist = glob.glob("{}*{}.pkl".format(self.rootdir,checksum))
+        #filelist = [x for x in filelist if ".gold." not in filelist]
+        print filelist
+        
+        
+        
     def _checksums(self, candidates, dicts):
         '''Compute MD5 checksums for all assets used to  
         create this candidate set'''
@@ -54,7 +67,7 @@ class CandidateVersioner(object):
         for name,d in dicts.items():
             manifest["dictionary:{}".format(name)] = checksum(d) 
         # doc and candidate checksum
-        doc_ids = sorted(set([c.doc_id for c in candidates]))
+        doc_ids = sorted(set([c.sentence["doc_id"] for c in candidates]))
         manifest["doc_ids"] = checksum(doc_ids)
         manifest["candidates"] = checksum(cands2str(candidates))
         # some count data about candidates
