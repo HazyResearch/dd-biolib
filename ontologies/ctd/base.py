@@ -1,6 +1,6 @@
 import codecs
 
-def load_ctd_dictionary(filename):
+def load_ctd_dictionary(filename, ignore_case=True):
     '''Comparative Toxicogenomics Database'''
     d = {}
     header = ['DiseaseName', 'DiseaseID', 'AltDiseaseIDs', 'Definition', 
@@ -22,4 +22,4 @@ def load_ctd_dictionary(filename):
             synonyms.update( dict.fromkeys(row["Synonyms"].strip().split("|")))
             dnames[row["DiseaseName"].strip()] = 1
     
-    return {term:1 for term in synonyms.keys()+dnames.keys() if term}
+    return {term.lower() if ignore_case else term:1 for term in synonyms.keys()+dnames.keys() if term}

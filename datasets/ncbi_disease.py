@@ -1,11 +1,14 @@
 import os
 import glob
-import utils
 import codecs
 import subprocess
 from collections import namedtuple
-from corpora import Corpus,Document,DocParser
-from parsers import CoreNlpParser,PickleSerializedParser
+#from ddbiolib.utils import download
+#from ddbiolib.corpora import Corpus,Document,DocParser
+#from ddbiolib.parsers import CoreNlpParser,PickleSerializedParser
+from ..utils import download
+from ..corpora import Corpus,Document,DocParser
+from ..parsers import CoreNlpParser,PickleSerializedParser
 
 class NcbiDiseaseParser(DocParser):
     '''
@@ -37,7 +40,7 @@ class NcbiDiseaseParser(DocParser):
             if os.path.exists(outfname):
                 continue
             print("Downloading NCBI Disease Corpus dataset [{}]...".format(os.path.basename(outfname)))
-            utils.download(url+fname,outfname)
+            download(url+fname,outfname)
             cwd = os.getcwd()
             os.chdir(self.inputpath)
             subprocess.call(["unzip", outfname])

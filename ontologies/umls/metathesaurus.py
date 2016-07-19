@@ -1,10 +1,14 @@
 import re
 import os
-import sys
 import networkx as nx
-from utils import database
-from config import DEFAULT_UMLS_CONFIG
-from semantic_network import SemanticNetwork
+
+#from ddbiolib.utils import database
+#from ddbiolib.ontologies.umls.config import DEFAULT_UMLS_CONFIG
+#from ddbiolib.ontologies.umls.semantic_network import SemanticNetwork
+
+from ...utils import database
+from .config import DEFAULT_UMLS_CONFIG
+from .semantic_network import SemanticNetwork
 
 class Metathesaurus(object):
     """

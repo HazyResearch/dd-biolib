@@ -1,3 +1,3 @@
-from parsers.base import *
-from parsers.serialization import *
-from parsers.corenlp_parser import *
+from .base import *
+from .serialization import *
+from .corenlp_parser import *

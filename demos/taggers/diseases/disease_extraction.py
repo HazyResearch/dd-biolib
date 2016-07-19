@@ -1,22 +1,44 @@
 from __future__ import print_function
-import re
+import os
 import sys
+sys.path.insert(1, os.path.join(sys.path[0], '..'))
 import itertools
 import numpy as np
 
-from ddlite import *
+#from ddlite import *
 from ddlite_candidates import Candidates
 from ddlite_candidates import Ngrams,Ngram
 from ddlite_matchers import DictionaryMatch,Union,Concat,RegexMatchSpan
 
-from datasets import ncbi_disease
+from ddbiolib.datasets import ncbi_disease
 from versioning import CandidateVersioner
 from ontologies.umls import UmlsNoiseAwareDict
 from ontologies.ctd import load_ctd_dictionary
 from ontologies.bioportal import load_bioportal_csv_dictionary
-from tools import load_disease_dictionary,load_acronym_dictionary
 
-from matchers import NcbiDiseaseDictionaryMatch
+def clean_dictionary(dictionary ,stopwords, ignore_case=True):
+    '''Remove stopwords'''
+    rm = []
+    for term in dictionary:
+        t = term.lower() if ignore_case else term
+        if t in stopwords:
+            rm += [term]
+    for t in rm:
+        del dictionary[t]
+
+def get_stopwords():
+    dictfiles = ["../data/dicts/diseases/cell_molecular_dysfunction.txt",
+                 "../data/dicts/diseases/umls_geographic_areas.txt",
+                 "../data/dicts/diseases/stopwords.txt"]
+    stopwords = {}
+    for fname in dictfiles:
+        d = [line.strip().split("\t")[0].lower() for line in open(fname).readlines()]
+        d = [t for t in d if len(t) > 1 and t]
+        stopwords.update(dict.fromkeys(d))
+    return stopwords
+
+
+
 
 common_disease_acronyms = ["AAPC", "AAS", "ABCD syndrome", "ACC", "ACS", "ACTH deficiency", "AD", "AD", "ADD",
                            "ADD-RT", "ADEM", "ADHD", "AF", "AGS", "AHC", "AIDS", "AIP", "ALA DD", "ALI", "ALS",

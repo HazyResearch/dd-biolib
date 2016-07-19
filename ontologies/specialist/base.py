@@ -19,7 +19,7 @@ https://lexsrv3.nlm.nih.gov/LexSysGroup/Projects/lexicon/current/web/index.html
 @author: jason-fries [at] stanford [dot] edu
 '''
 import os
-from utils import download
+from ...utils import download
 from urllib2 import urlopen, URLError, HTTPError
 
 def download_dataset(version="2016"):

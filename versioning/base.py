@@ -1,8 +1,6 @@
-import os
-import random
 import hashlib
 from datetime import datetime
-from ddlite import *
+from ddlite import Relations
 
 def dict2str(d):
     '''Convert dictionary to tuple pair string'''

@@ -16,10 +16,10 @@ import glob
 import codecs
 import itertools
 import subprocess
-from utils import database
 from functools import partial
 from collections import defaultdict
-from config import DEFAULT_UMLS_CONFIG
+from ...utils import database
+from .config import DEFAULT_UMLS_CONFIG
 
 def dict_function_factory(dictionary,rvalue,name,ignore_case=True):
     '''Dynamically create a labeling function object'''
@@ -29,7 +29,8 @@ def dict_function_factory(dictionary,rvalue,name,ignore_case=True):
     function_template.__name__ = name
     return function_template
 
-def build_umls_dictionaries(config,min_occur=50):
+
+def build_umls_dictionaries(config,min_occur=1):
     '''Create UMLS dictionaries broken down by semantic type and
     source vocabulary. Term types (TTY) are used to filter out 
     obselete terms an '''
@@ -55,11 +56,15 @@ def build_umls_dictionaries(config,min_occur=50):
     for row in results:
         text,sty,sab,tty = row
         sty = sty.lower().replace(" ","_")
+        
+        abbrv[sty][sab][text] = 1
+        '''
+        # DONT ASSUME LOWERCASE FOR TERMS?
         if tty in abbrv_tty:
             abbrv[sty][sab][text] = 1
         elif tty not in not_term_tty:
             terms[sty][sab][text.lower()] = 1
-            
+        '''
     for sty in abbrv:
         for sab in abbrv[sty]:
             outfname = "{}/data/cache/abbrvs/{}.{}.abbrv.txt".format(module_path,sty,sab) 
@@ -96,15 +101,18 @@ class UmlsNoiseAwareDict(object):
         self.encoding = "utf-8"
         self.ignore_case = ignore_case
         self._dictionary = self._load_dictionaries()
+    
         
     def _norm_sty_name(self,s):
         return s.lower().replace(" ","_")
+    
     
     def _load_dictionaries(self):
         '''Load dictionaries base on provided positive/negative 
         entity examples'''
         d = defaultdict(defaultdict)
         filelist = glob.glob("{}*.txt.bz2".format(self.rootdir))
+        
         for fpath in filelist:
             fname = fpath.split("/")[-1].rstrip(".txt.bz2")
             i = fname.index(".")
@@ -119,11 +127,25 @@ class UmlsNoiseAwareDict(object):
             with bz2.BZ2File(fpath,"rb") as f:
                 for line in f:
                     terms += [line.strip().lower() if self.ignore_case else line.strip()]
-                    
-            d[sty][sab] = dict.fromkeys(terms)
+            
+            if sty in d and sab in d[sty]:    
+                d[sty][sab].update(dict.fromkeys(terms))
+            else:
+                d[sty][sab] = dict.fromkeys(terms)
             
         return d    
     
+    
+    def get_semantic_types(self,term):
+        '''Return all matching semantic types for this term '''
+        stys = {}
+        for sty in self._dictionary:
+            for sab in self._dictionary[sty]:
+                if term in self._dictionary[sty][sab]:
+                    stys[sty] = stys.get(sty,0) + 1    
+        return stys
+                    
+                    
     def dictionary(self,semantic_types=None,source_vocab=None):
         '''Create a single dictionary building using the provided semantic types
         and source vocabularies. If either are None, use all available types. 
@@ -151,4 +173,5 @@ class UmlsNoiseAwareDict(object):
                 
 
 if __name__ == "__main__":
+    # create dictionary cache 
     build_umls_dictionaries(DEFAULT_UMLS_CONFIG)             

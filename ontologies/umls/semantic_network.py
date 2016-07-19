@@ -1,11 +1,6 @@
-import argparse
-import sys
-import re
 import os
-import config
-import operator
 import networkx as nx
-from utils import database
+from ...utils import database
 
 class SemanticNetwork(object):
     """
@@ -21,8 +16,7 @@ class SemanticNetwork(object):
                                        config.dbname, config.password)
         self.conn.connect()
         self._networks = {}
-        # load semantic group definitions
-        self.abbrv, self.groups = self.__load_sem_groups()
+        self.abbrv, self.groups = self.__load_sem_groups() # load semantic group definitions
         
         
     def __load_sem_groups(self):
@@ -76,4 +70,3 @@ class SemanticNetwork(object):
             self._networks[relation] = self.__build_semantic_network(relation,directed)
         return self._networks[relation]
     
-   

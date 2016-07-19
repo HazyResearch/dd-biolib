@@ -12,7 +12,7 @@ import signal
 import requests
 import subprocess
 from collections import defaultdict
-from .base import Sentence,SentenceParser
+from .base import Sentence, SentenceParser
 
 def sort_X_on_Y(X, Y):
     return [x for (y,x) in sorted(zip(Y,X), key=lambda t : t[0])]    
