@@ -3,9 +3,6 @@ import glob
 import codecs
 import subprocess
 from collections import namedtuple
-#from ddbiolib.utils import download
-#from ddbiolib.corpora import Corpus,Document,DocParser
-#from ddbiolib.parsers import CoreNlpParser,PickleSerializedParser
 from ..utils import download
 from ..corpora import Corpus,Document,DocParser
 from ..parsers import CoreNlpParser,PickleSerializedParser

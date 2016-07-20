@@ -1,3 +1,5 @@
+import os
+import sys
 import glob
 import hashlib
 import cPickle
@@ -8,6 +10,7 @@ def dict2str(d):
     '''Convert dictionary to tuple pair string'''
     return str(d).encode("utf-8",errors="ignore")
 
+
 def checksum(s):
     '''Create checksum for input object'''
     if type(s) is dict:
@@ -17,6 +20,7 @@ def checksum(s):
     m = hashlib.md5()
     m.update(s)
     return m.hexdigest()
+
 
 def cands2str(candidates):
     '''Convert DeepDive Relations object to string'''
@@ -31,34 +35,50 @@ def cands2str(candidates):
 
 class CandidateVersioner(object):
     '''Create unique version ID for candidate set while saving to disk'''
-    def __init__(self,rootdir,prefix=""):
+    def __init__(self, rootdir, prefix="", dicts={}):
         self.rootdir = rootdir
         self.prefix = prefix
+        self.dicts = dicts
+        self._candidates = {}
         self.filename = None
         self.checksum = None
         
-    def save(self, candidates, dicts):
+        
+    def snapshot(self, name, candidates):
+        self._candidates[name] = candidates
+    
+    
+    def save(self):
         '''Save checksummed version of candidate set. This computes
         checksums based on dictionaries, input documents, and final
         candidate set'''
-        manifest = self._checksums(candidates, dicts)
+        candidates = reduce(lambda x,y:x+y, self._candidates.values())
+        manifest = self._checksums(candidates, self.dicts)
         # dump candidates and log file
-        ctype = "RELATIONS." if type(candidates) is Relations else "ENTITIES."
+        ctype = "RELATIONS." if type(self._candidates) is Relations else "ENTITIES."
         prefix = self.prefix + "." if self.prefix else ""
         self.filename = "{}/{}{}{}".format(self.rootdir,prefix,ctype,manifest["uid"])
         
-        cPickle.dump(candidates, open("{}.pkl".format(self.filename),"w"))
+        cPickle.dump(self._candidates, open("{}.pkl".format(self.filename),"w"))
         self._write_log(self.filename,manifest)
         self.checksum = manifest["uid"]
-    
-    
+        
+        
     def load(self,checksum):
         filelist = glob.glob("{}*{}.pkl".format(self.rootdir,checksum))
-        #filelist = [x for x in filelist if ".gold." not in filelist]
-        print filelist
+        if len(filelist) > 1:
+            print>>sys.stderr,"Warning: multiple matching checksums"    
+        elif not len(filelist):
+            print>>sys.stderr,"Error: snapshot not found"  
+            return {}  
         
-        
-        
+        fname = filelist[0]
+        self._candidates = cPickle.load(open(fname,"rb"))
+        self.filename = fname.strip(".pkl")
+        self.checksum = checksum
+        return self._candidates
+
+            
     def _checksums(self, candidates, dicts):
         '''Compute MD5 checksums for all assets used to  
         create this candidate set'''
@@ -78,6 +98,7 @@ class CandidateVersioner(object):
         values = map(str,values)
         manifest["uid"] = checksum(reduce(lambda x,y:x+y,values))
         return manifest
+    
     
     def _write_log(self,filename,manifest):
         # write checksums to text file

@@ -1,11 +1,9 @@
 import os
+import sys
 import glob
 import codecs
 import subprocess
 from collections import namedtuple
-#from ddbiolib.utils import download
-#from ddbiolib.corpora import Corpus,Document,DocParser
-#from ddbiolib.parsers import CoreNlpParser,PickleSerializedParser
 from ..utils import download
 from ..corpora import Corpus,Document,DocParser
 from ..parsers import CoreNlpParser,PickleSerializedParser
@@ -29,7 +27,7 @@ class CdrParser(DocParser):
         self._preload(entity_type)
         
     def _download(self):
-        pass
+        print>>sys.stderr,"CDR files require signing a Biocreative account. See http://www.biocreative.org/accounts/register/"
 
     def _preload(self, et):
         '''Load entire corpus into memory'''
