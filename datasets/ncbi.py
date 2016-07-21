@@ -73,7 +73,7 @@ class NcbiDiseaseCorpus(Corpus):
                     # assess ground truth on token
                     label = tag[0] # gold standard annotation text
                     span = tag[-1]
-                    char_idx = doc[sent_id].token_idxs[span[0]]
+                    char_idx = doc[sent_id].char_offsets[span[0]]
                     char_span = tuple([char_idx, char_idx+len(label)])
                     
                     ground_truth += [(pmid, sent_id, tuple(range(*span)), char_span, label.replace(" ",""))]
@@ -91,7 +91,7 @@ class NcbiDiseaseCorpus(Corpus):
         for idx,c in enumerate(candidates):
             text = "".join([c.words[i] for i in c.idxs])
             
-            char_span = [c.token_idxs[i] for i in c.idxs]
+            char_span = [c.char_offsets[i] for i in c.idxs]
             char_span = (char_span[0], char_span[-1] + len(c.words[c.idxs[-1]]))
             char_span = tuple(char_span)
             
@@ -212,7 +212,7 @@ class NcbiDiseaseCorpus(Corpus):
     
     def getkey(self,c):
         txt = " ".join(c.mention())
-        char_span = [c.token_idxs[i] for i in c.idxs]
+        char_span = [c.char_offsets[i] for i in c.idxs]
         char_span = (min(char_span),min(char_span)+len(txt))
         return (c.doc_id, c.sent_id, tuple(c.idxs), char_span, "".join(c.mention()))
         #return (c.doc_id, c.sent_id, tuple(c.idxs), "".join(c.mention()))
@@ -349,28 +349,28 @@ class NcbiDiseaseCorpus(Corpus):
         '''
         tags = [[] for i,_ in enumerate(sentences)]
         
-        sents = {min(sent.token_idxs):sent for sent in sentences}
+        sents = {min(sent.char_offsets):sent for sent in sentences}
         sent_offsets = sorted(sents)
         
         for label in annotations:
             # find target sentence
             for i in range(len(sent_offsets)):
                 start = sent_offsets[i]  
-                end = sents[start].token_idxs[-1] + 1
+                end = sents[start].char_offsets[-1] + 1
                 
                 # determine span match (assume potentially overlapping spans)
                 if label.start >= start and label.start <= end:
                     span = [label.start, label.start + len(label.text)]
                     idx = len(sents[start].words)-1
                     for j in range(0,len(sents[start].words)-1):
-                        if span[0] >= sents[start].token_idxs[j] and span[0] < sents[start].token_idxs[j+1]:
+                        if span[0] >= sents[start].char_offsets[j] and span[0] < sents[start].char_offsets[j+1]:
                             idx = j
                             break
                     
                     s_start = idx
                     s_end = len(sents[start].words)
                     for j in range(idx,len(sents[start].words)):
-                        if span[1] > sents[start].token_idxs[j]:
+                        if span[1] > sents[start].char_offsets[j]:
                             s_end = j + 1
                         else:
                             break
