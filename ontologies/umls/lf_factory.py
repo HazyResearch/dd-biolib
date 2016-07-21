@@ -20,6 +20,7 @@ from functools import partial
 from collections import defaultdict
 from ...utils import database
 from .config import DEFAULT_UMLS_CONFIG
+from .metathesaurus import MetaNorm
 
 def dict_function_factory(dictionary,rvalue,name,ignore_case=True):
     '''Dynamically create a labeling function object'''
@@ -39,9 +40,10 @@ def build_umls_dictionaries(config,min_occur=1):
     if len(filelist) > 0:
         return
     
+    mn = MetaNorm()
+    
     abbrv_tty = dict.fromkeys(['AA','AB','ACR'])
-    not_term_tty = dict.fromkeys(['AA','AB','ACR','OAS','OAP','OAF','FN',
-                                  'OF','MTH_OF','MTH_IS','LPN','AUN'])
+    not_term_tty = dict.fromkeys(['AA','AB','ACR','LPN','AUN'])
     
     conn = database.MySqlConn(config.host, config.username, 
                               config.dbname, config.password)
@@ -57,14 +59,13 @@ def build_umls_dictionaries(config,min_occur=1):
         text,sty,sab,tty = row
         sty = sty.lower().replace(" ","_")
         
-        abbrv[sty][sab][text] = 1
-        '''
-        # DONT ASSUME LOWERCASE FOR TERMS?
+        text = mn.normalize(text) # normalize to remove junk characters
+        
         if tty in abbrv_tty:
             abbrv[sty][sab][text] = 1
         elif tty not in not_term_tty:
-            terms[sty][sab][text.lower()] = 1
-        '''
+            terms[sty][sab][text] = 1
+        
     for sty in abbrv:
         for sab in abbrv[sty]:
             outfname = "{}/data/cache/abbrvs/{}.{}.abbrv.txt".format(module_path,sty,sab) 
@@ -101,7 +102,7 @@ class UmlsNoiseAwareDict(object):
         self.encoding = "utf-8"
         self.ignore_case = ignore_case
         self._dictionary = self._load_dictionaries()
-    
+        
         
     def _norm_sty_name(self,s):
         return s.lower().replace(" ","_")
@@ -126,8 +127,14 @@ class UmlsNoiseAwareDict(object):
             terms = []
             with bz2.BZ2File(fpath,"rb") as f:
                 for line in f:
-                    terms += [line.strip().lower() if self.ignore_case else line.strip()]
-            
+                    if not line.strip():
+                        continue
+                    try:
+                        line = line.strip().decode('utf-8')
+                        terms += [line.strip().lower() if self.ignore_case else line.strip()]
+                    except:
+                        print>>sys.stderr,"Warning: unicode conversion error"
+                        
             if sty in d and sab in d[sty]:    
                 d[sty][sab].update(dict.fromkeys(terms))
             else:
@@ -146,10 +153,12 @@ class UmlsNoiseAwareDict(object):
         return stys
                     
                     
-    def dictionary(self,semantic_types=None,source_vocab=None):
+    def dictionary(self,semantic_types=[],source_vocab=[]):
         '''Create a single dictionary building using the provided semantic types
         and source vocabularies. If either are None, use all available types. 
         '''
+        # normalize semantic type names
+        semantic_types = [self._norm_sty_name(x) for x in semantic_types]
         semantic_types = self._dictionary if not semantic_types else semantic_types
         sabs = list(itertools.chain.from_iterable([self._dictionary[sty].keys() for sty in self._dictionary]))
         source_vocab = dict.fromkeys(sabs) if not source_vocab else source_vocab    

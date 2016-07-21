@@ -335,6 +335,10 @@ class MetaNorm(object):
         s = re.sub("(\[.{1}\])+","", s).strip()
         s = re.sub("\-RETIRED\-$","",s).strip()
         
+        # normalize TTY in [OF,FN]
+        rgx = '\((qualifier value|life style|cell structure|context\-dependent category|inactive concept|navigational concept|lck|record artifact|core metadata concept|substance|event|organism|person|attribute|procedure|tumor staging|a|cell|chloroaniline|product|specimen|observable entity|racial group|si|namespace concept|environment|social concept|ras|special concept|staging scale|geographic location|occupation|body structure|situation|physical force|trans|finding|epoxymethano|linkage concept|assessment scale|metadata|link assertion|dithiocarbamates|foundation metadata concept|disorder|morphologic abnormality|physical object|ethnic group)\)$'
+        s = re.sub(rgx,"",s).strip()
+        
         # custom normalize function
         s = self.function(s)
         return s
