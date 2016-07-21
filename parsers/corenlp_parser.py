@@ -4,6 +4,7 @@ CoreNLP wrapper
 
 '''
 import os
+import re
 import sys
 import json
 import glob
@@ -58,8 +59,12 @@ class CoreNlpParser(SentenceParser):
                         status_forcelist=[ 500, 502, 503, 504 ])
         self.requests_session.mount('http://', HTTPAdapter(max_retries=retries))
 
+    def _rm_ascii_control_chars(self,t):
+        # TODO -- add this to parse
+        return re.sub(u"[\x00-\x1F]|[\x7F]", u"", t)
+
     def _install(self):
-        '''Install corenlp'''
+        '''Install CoreNLP'''
         cwd = os.getcwd()
         os.chdir("{}/parsers/".format(cwd))
         subprocess.call(["./install-corenlp.sh"]) 

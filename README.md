@@ -1,6 +1,6 @@
-# DeepDive Biomedical Library
+# Snorkel Biomedical Tools
 
-This module consists of tools for iterating over biomedical document collections, interacting with biomedical ontologies, and creating dictionaries for labeling entity candidates. 
+This module consists of tools for iterating over biomedical document collections, interacting with biomedical ontologies, and creating dictionaries for labeling entities. 
 
 ## Installing ddbiolib
 
