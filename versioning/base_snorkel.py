@@ -8,6 +8,7 @@ import glob
 import hashlib
 import cPickle
 from ddlite import Relations
+#from snorkel.snorkel import Relations
 from datetime import datetime
 
 def dict2str(d):
