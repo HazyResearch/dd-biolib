@@ -1,3 +1,8 @@
+'''
+DEPRICATED
+
+Include only for backwards compatibility with TACL experiments
+'''
 import os
 import re
 import sys
@@ -111,6 +116,7 @@ class NcbiDiseaseCorpus(Corpus):
         self._load_files()
         self.cache_path = cache_path
       
+      
     def __getitem__(self,pmid):
         """Use PMID as key and load parsed document object"""
         pkl_file = "%s/%s.pkl" % (self.cache_path, pmid)
@@ -136,8 +142,8 @@ class NcbiDiseaseCorpus(Corpus):
                 
             with open(pkl_file, 'w+') as f:
                 cPickle.dump(self.documents[pmid], f)
-        
         return self.documents[pmid]
+    
     
     def _ground_truth(self,doc_ids):
         '''Build ground truth (doc_id,sent_id,char_offset) mentions'''
@@ -157,6 +163,7 @@ class NcbiDiseaseCorpus(Corpus):
                     #ground_truth += [(pmid, sent_id, tuple(range(*span)),label.replace(" ",""))]
                     
         return ground_truth
+    
     
     def gold_labels(self,candidates):
         '''Given a set of candidates, generate -1,1 labels 
@@ -178,6 +185,7 @@ class NcbiDiseaseCorpus(Corpus):
             gold[idx] = 1 if mention in true_labels else -1
         
         return np.array(gold)
+    
     
     def score(self, candidates, prediction, doc_ids=None):
         '''Given a set of candidates, compute true precision, recall, f1
@@ -221,7 +229,6 @@ class NcbiDiseaseCorpus(Corpus):
     def classification_errors(self, candidates, prediction, doc_ids=None):
         # create doc set from candidate pool or a provided doc_id set
         doc_ids = {c.doc_id:1 for c in candidates} if not doc_ids else dict.fromkeys(doc_ids)
-        
         # compute original document character offsets for each mention
         mentions = {}
         for i,c in enumerate(candidates):
@@ -236,9 +243,9 @@ class NcbiDiseaseCorpus(Corpus):
         true_labels = set(self._ground_truth(doc_ids))
         tp = true_labels.intersection(mentions)
         fp = mentions.difference(tp)
-        fn = true_labels.difference(tp)
-        
+        fn = true_labels.difference(tp)    
         return (tp,fp,fn)
+    
     
     def _label_index(self,doc_ids):
         '''Ground truth annotation index'''
@@ -255,7 +262,6 @@ class NcbiDiseaseCorpus(Corpus):
     
     
     def _candidate_index(self,candidates):
-        
         candidate_idx = {}
         for i,c in enumerate(candidates):
             if c.doc_id not in candidate_idx:
@@ -269,12 +275,10 @@ class NcbiDiseaseCorpus(Corpus):
     
     
     def match(self, label, candidates, c_index=None, partial=True):
-        
+        ''' '''
         m = []
         c_index = self._candidate_index(candidates) if not c_index else c_index
-        
         doc_id,sent_id,idxs,_,_ = label
-        #doc_id,sent_id,idxs,_ = label
         if doc_id in c_index and sent_id in c_index[doc_id]:
             lspan = (min(idxs),max(idxs)+1)
             if lspan in c_index[doc_id][sent_id]:
@@ -284,20 +288,23 @@ class NcbiDiseaseCorpus(Corpus):
                 for cspan in c_index[doc_id][sent_id]:
                     if overlaps(range(*lspan),range(*cspan)) and lspan!=cspan:
                         m += [c_index[doc_id][sent_id][cspan]]
-                
         return m
     
     def getkey(self,c):
-        txt = " ".join(c.mention())
+        '''Generate unique key for mention so that our evaluation
+        can use set semantics'''
+        mention = unescape_penn_treebank(c.mention())
+        txt = " ".join(mention)
         char_span = [c.char_offsets[i] for i in c.idxs]
-        char_span = (min(char_span),min(char_span)+len(txt))
-        return (c.doc_id, c.sent_id, tuple(c.idxs), char_span, "".join(c.mention()))
-        #return (c.doc_id, c.sent_id, tuple(c.idxs), "".join(c.mention()))
-    
+        #char_span = (min(char_span),min(char_span)+len(txt))
+        char_span = (min(char_span), max(char_span) + len(mention[-1]))
+        
+        return (c.doc_id, c.sent_id, tuple(c.idxs), char_span, mention)
+      
+      
     def force_longest_match(self, candidates, probability, doc_ids=None):
         '''Only use longest correct match for any set of overlapping or 
         adjoining mentions'''
-    
         c_index = self._candidate_index(candidates)
         true_labels = set(self._ground_truth(doc_ids))
         pred_idx = {self.getkey(c):i for i,c in enumerate(candidates)}
@@ -310,8 +317,6 @@ class NcbiDiseaseCorpus(Corpus):
             lengths = [len(c.mention()) for c in mapping[label]]
             proba = [probability[pred_idx[self.getkey(c)]] for c in mapping[label]]
             scores = zip(proba,lengths,mapping[label])
-            print [(x,y,z.mention()) for (x,y,z) in sorted(scores,reverse=1)]
-            #scores = [c for _,c,p in sorted(zip(lengths,mapping[label],proba),reverse=1) if p > 0.5]
             scores = [c for p,l,c, in sorted(zip(proba,lengths,mapping[label]),reverse=1) if p > 0.499]
             
             if not scores:
