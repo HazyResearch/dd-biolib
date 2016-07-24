@@ -7,8 +7,6 @@ import sys
 import glob
 import hashlib
 import cPickle
-from ddlite import Relations
-#from snorkel.snorkel import Relations
 from datetime import datetime
 
 def dict2str(d):
@@ -32,7 +30,7 @@ def cands2str(candidates):
     convert = lambda x:x.encode("utf-8",errors="ignore")
     rela_func = lambda x:["{}:{}".format(x.sentence["doc_id"], x.sentence["sent_id"])] + map(convert,x.mention1("words")) + map(convert,x.mention2("words"))
     entity_func = lambda x:["{}:{}".format(x.sentence["doc_id"], x.sentence["sent_id"])] + map(convert,x.get_span())
-    get_row = rela_func if type(candidates) is Relations else entity_func
+    get_row = rela_func if str(type(candidates)) == "Relations" else entity_func
     # create string versions of candidates
     s = [":".join(get_row(c)) for c in candidates]
     return "|".join(sorted(s))
@@ -60,7 +58,7 @@ class CandidateVersioner(object):
         candidates = reduce(lambda x,y:x+y, self._candidates.values())
         manifest = self._checksums(candidates, self.dicts)
         # dump candidates and log file
-        ctype = "RELATIONS." if type(self._candidates) is Relations else "ENTITIES."
+        ctype = "RELATIONS." if str(type(self._candidates)) == "Relations" else "ENTITIES."
         prefix = self.prefix + "." if self.prefix else ""
         self.filename = "{}/{}{}{}".format(self.rootdir,prefix,ctype,manifest["uid"])
         
@@ -75,8 +73,7 @@ class CandidateVersioner(object):
             print>>sys.stderr,"Warning: multiple matching checksums"    
         elif not len(filelist):
             print>>sys.stderr,"Error: snapshot not found"  
-            return {}  
-        
+            return {}     
         fname = filelist[0]
         self._candidates = cPickle.load(open(fname,"rb"))
         self.filename = fname.strip(".pkl")
