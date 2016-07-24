@@ -299,7 +299,7 @@ class NcbiDiseaseCorpus(Corpus):
         #char_span = (min(char_span),min(char_span)+len(txt))
         char_span = (min(char_span), max(char_span) + len(mention[-1]))
         
-        return (c.doc_id, c.sent_id, tuple(c.idxs), char_span, mention)
+        return (c.doc_id, c.sent_id, tuple(c.idxs), char_span, "".join(mention))
       
       
     def force_longest_match(self, candidates, probability, doc_ids=None):
