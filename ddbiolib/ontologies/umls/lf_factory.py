@@ -43,7 +43,7 @@ def build_umls_dictionaries(config,min_occur=1):
     mn = MetaNorm()
     
     abbrv_tty = dict.fromkeys(['AA','AB','ACR'])
-    not_term_tty = dict.fromkeys(['AA','AB','ACR','LPN','AUN'])
+    not_term_tty = dict.fromkeys(['AA','AB','ACR','AUN']) #'LPN'
     
     conn = database.MySqlConn(config.host, config.username, 
                               config.dbname, config.password)
@@ -91,7 +91,7 @@ class UmlsNoiseAwareDict(object):
     '''Use UMLS semantic types and source vocabulary information
     to create labeling functions for providing supervision for 
     tagging tasks'''
-    def __init__(self, positive=[], negative=[], name="",
+    def __init__(self, positive=[], negative=[], name="", rm_sab=[],
                  rootdir=None, ignore_case=True):
         
         module_path = os.path.dirname(__file__)
@@ -102,6 +102,7 @@ class UmlsNoiseAwareDict(object):
         self.encoding = "utf-8"
         self.ignore_case = ignore_case
         self._dictionary = self._load_dictionaries()
+        self.rm_sab = rm_sab
         
         
     def _norm_sty_name(self,s):
@@ -173,6 +174,8 @@ class UmlsNoiseAwareDict(object):
         '''Create labeling functions for each semantic type/source vocabulary'''
         for sty in self._dictionary:
             for sab in self._dictionary[sty]:
+                if sab in self.rm_sab:
+                    continue
                 label = "pos" if sty in self.positive else "neg"
                 prefix = "{}_".format(self.name) if self.name else ""
                 func_name = "LF_{}{}_{}_{}".format(prefix,sty,sab,label)

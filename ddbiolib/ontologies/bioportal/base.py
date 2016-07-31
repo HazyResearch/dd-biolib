@@ -1,6 +1,6 @@
 import unicodecsv
 
-def load_bioportal_csv_dictionary(filename, ignore_case=True):
+def load_bioportal_dictionary(filename, ignore_case=True):
     '''BioPortal Ontologies
     http://bioportal.bioontology.org/'''  
     reader = unicodecsv.reader(open(filename,"rb"),  delimiter=',', quotechar='"', encoding='utf-8')

@@ -205,6 +205,7 @@ class NcbiDiseaseCorpus(Corpus):
                 continue
             if prediction[i] != 1:
                 continue  
+
             mentions[self.getkey(c)] = 1
         
         # score

@@ -94,13 +94,13 @@ class NcbiDiseaseParser(DocParser):
             yield self._docs[pmid]
 
 
-def load_corpus():
+def load_corpus(parser=CoreNlpParser()):
     '''Load NCBI Disease Corpus
     '''
     # init cache directory and parsers
     cache_dir = "{}/data/ncbi_disease_corpus/cache/".format(os.path.dirname(__file__))
     doc_parser = NcbiDiseaseParser()
-    text_parser = PickleSerializedParser(CoreNlpParser(),rootdir=cache_dir)
+    text_parser = PickleSerializedParser(parser,rootdir=cache_dir)
     
     # create cross-validation set information
     attributes = {"sets":{"testing":[],"training":[],"development":[]}}
