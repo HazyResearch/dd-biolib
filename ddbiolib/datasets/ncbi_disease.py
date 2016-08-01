@@ -5,7 +5,7 @@ import subprocess
 from collections import namedtuple
 from ..utils import download
 from ..corpora import Corpus,Document,DocParser
-from ..parsers import CoreNlpParser,PickleSerializedParser
+from ..parsers import PickleSerializedParser
 
 class NcbiDiseaseParser(DocParser):
     '''
@@ -94,7 +94,7 @@ class NcbiDiseaseParser(DocParser):
             yield self._docs[pmid]
 
 
-def load_corpus(parser=CoreNlpParser()):
+def load_corpus(parser):
     '''Load NCBI Disease Corpus
     '''
     # init cache directory and parsers

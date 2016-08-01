@@ -6,7 +6,7 @@ import subprocess
 from collections import namedtuple
 from ..utils import download
 from ..corpora import Corpus,Document,DocParser
-from ..parsers import CoreNlpParser,PickleSerializedParser
+from ..parsers import PickleSerializedParser
 
 class CdrParser(DocParser):
     '''
@@ -101,7 +101,7 @@ class CdrParser(DocParser):
             yield self._docs[pmid]
 
 
-def load_corpus(entity_type="Disease",parser=CoreNlpParser()):
+def load_corpus(parser,entity_type="Disease"):
     '''Load CDR Disease Corpus
     '''
     # init cache directory and parsers
