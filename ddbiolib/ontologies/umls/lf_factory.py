@@ -104,7 +104,7 @@ class UmlsNoiseAwareDict(object):
         self._dictionary = self._load_dictionaries()
         self.rm_sab = rm_sab
         
-        
+    
     def _norm_sty_name(self,s):
         return s.lower().replace(" ","_")
     
@@ -170,12 +170,16 @@ class UmlsNoiseAwareDict(object):
         d = map(lambda x:list(itertools.chain.from_iterable(x)),d)
         return dict.fromkeys(itertools.chain.from_iterable(d))
         
-    def lfs(self):
+    def lfs(self,min_size=0):
         '''Create labeling functions for each semantic type/source vocabulary'''
         for sty in self._dictionary:
             for sab in self._dictionary[sty]:
                 if sab in self.rm_sab:
                     continue
+                
+                if len(self._dictionary[sty][sab]) <= min_size:
+                    continue
+                
                 label = "pos" if sty in self.positive else "neg"
                 prefix = "{}_".format(self.name) if self.name else ""
                 func_name = "LF_{}{}_{}_{}".format(prefix,sty,sab,label)

@@ -23,11 +23,13 @@ class CdrParser(DocParser):
         else:
             self.inputpath = inputpath
         self._docs = {}
-        self._download()
+        # download CDR data
+        if not os.path.exists(self.inputpath):
+            self._download()
         self._preload(entity_type)
         
     def _download(self):
-        print>>sys.stderr,"CDR files require signing a Biocreative account. See http://www.biocreative.org/accounts/register/"
+        print>>sys.stderr,"CDR files require a Biocreative account. See http://www.biocreative.org/accounts/register/"
 
     def _preload(self, et):
         '''Load entire corpus into memory'''
