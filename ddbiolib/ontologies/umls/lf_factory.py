@@ -25,7 +25,7 @@ from .metathesaurus import MetaNorm
 def dict_function_factory(dictionary,rvalue,name,ignore_case=True):
     '''Dynamically create a labeling function object'''
     def function_template(m):
-        mention = " ".join(m.mention()).lower() if ignore_case else " ".join(m.mention())
+        mention = " ".join(m.get_attrib_tokens('words')).lower() if ignore_case else " ".join(m.get_attrib_tokens('words'))
         return rvalue if mention in dictionary else 0
     function_template.__name__ = name
     return function_template
