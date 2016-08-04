@@ -153,8 +153,10 @@ class UmlsNoiseAwareDict(object):
                     stys[sty] = stys.get(sty,0) + 1    
         return stys
                     
+    def get_dictionary(self,semantic_types=[],source_vocab=[], min_size=1):
+        return self.dictionary(semantic_types,source_vocab, min_size)
                     
-    def dictionary(self,semantic_types=[],source_vocab=[]):
+    def dictionary(self,semantic_types=[],source_vocab=[], min_size=1):
         '''Create a single dictionary building using the provided semantic types
         and source vocabularies. If either are None, use all available types. 
         '''
@@ -163,12 +165,23 @@ class UmlsNoiseAwareDict(object):
         semantic_types = self._dictionary if not semantic_types else semantic_types
         sabs = list(itertools.chain.from_iterable([self._dictionary[sty].keys() for sty in self._dictionary]))
         source_vocab = dict.fromkeys(sabs) if not source_vocab else source_vocab    
-          
-        d = [[self._dictionary[sty][sab].keys() for sab in self._dictionary[sty] if sab in source_vocab] 
-             for sty in self._dictionary if sty in semantic_types]
- 
-        d = map(lambda x:list(itertools.chain.from_iterable(x)),d)
-        return dict.fromkeys(itertools.chain.from_iterable(d))
+        
+        # filter ontologies by size and source
+        d = []
+        for sty in self._dictionary:
+            if sty not in semantic_types:
+                continue
+            
+            for sab in self._dictionary[sty]:   
+                if sab not in source_vocab:
+                    continue
+                if len(self._dictionary[sty][sab]) <= min_size:
+                    continue
+                
+                d += self._dictionary[sty][sab].keys()
+        
+        return dict.fromkeys(d)
+        
         
     def lfs(self,min_size=0):
         '''Create labeling functions for each semantic type/source vocabulary'''

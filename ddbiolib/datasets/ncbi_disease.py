@@ -1,4 +1,5 @@
 import os
+import sys
 import glob
 import codecs
 import subprocess
@@ -32,10 +33,12 @@ class NcbiDiseaseParser(DocParser):
         '''If corpus files aren't available, automatically download them'''
         url = "http://www.ncbi.nlm.nih.gov/CBBresearch/Dogan/DISEASE/"
         filelist = ["NCBItrainset_corpus.zip","NCBItestset_corpus.zip","NCBIdevelopset_corpus.zip"]
+        
         for fname in filelist:
             outfname = "{}{}".format(self.inputpath,fname)
             if os.path.exists(outfname):
                 continue
+            
             print("Downloading NCBI Disease Corpus dataset [{}]...".format(os.path.basename(outfname)))
             download(url+fname,outfname)
             cwd = os.getcwd()
@@ -44,9 +47,10 @@ class NcbiDiseaseParser(DocParser):
             os.chdir(cwd)
             
     def _preload(self):
-        '''Load entire corpus into memory'''
+        '''Load corpus into memory'''
         Annotation = namedtuple('Annotation', ['text_type','start','end','text','mention_type'])
         
+        # holdout set definitions
         cvdefs = {"NCBIdevelopset_corpus.txt":"development",
                   "NCBItestset_corpus.txt":"testing",
                   "NCBItrainset_corpus.txt":"training"}
@@ -83,6 +87,10 @@ class NcbiDiseaseParser(DocParser):
                     label = Annotation(text_type, start, end, mention, mention_type)
                     attributes["annotations"] += [label]
 
+                # warning if PMID is already loaded
+                if pmid in self._docs:
+                    print >> sys.stderr, "WARNING: Duplicate PMID {} found".format(pmid)
+                    
                 doc = Document(pmid,text,attributes=attributes)
                 self._docs[pmid] = doc
     
