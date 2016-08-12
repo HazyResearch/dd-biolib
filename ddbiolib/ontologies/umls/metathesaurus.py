@@ -316,14 +316,46 @@ class Metathesaurus(object):
         
         return results
     
+
+class TextNorm(object):
+    def __init__(self, function=lambda x:x):
+        self.function = function
+        
+    def normalize(self,s):  
+        # custom normalize function
+        s = self.function(s)
+        return s  
     
-class MetaNorm(object):
+    def apply(self,s):
+        return self.normalize(s)   
+   
+class MetaNorm(TextNorm):
     """
     Normalize UMLS Metathesaurus concept strings. 
     """
     def __init__(self, function=lambda x:x):
-        self.function = function
-    
+        super(MetaNorm, self).__init__(function)
+        
+        # TTY in [OF,FN] suffixes
+        suffixes = ['qualifier value', 'life style', 'cell structure', 
+                     'context\\-dependent category', 'inactive concept', 
+                     'navigational concept', 'lck', 'record artifact', 
+                     'core metadata concept', 'substance', 'event', 
+                     'organism', 'person', 'attribute', 'procedure', 
+                     'tumor staging', 'a', 'cell', 'chloroaniline', 
+                     'product', 'specimen', 'observable entity', 
+                     'racial group', 'si', 'namespace concept', 
+                     'environment', 'social concept', 'ras', 
+                     'special concept', 'staging scale', 'disorder',
+                     'geographic location', 'occupation', 'ethnic group',
+                     'body structure', 'situation', 'physical force', 
+                     'trans', 'finding', 'epoxymethano', 'linkage concept', 
+                     'assessment scale', 'metadata', 'link assertion', 
+                     'dithiocarbamates', 'foundation metadata concept',  
+                     'morphologic abnormality', 'physical object']
+        self.of_fn_rgx = "\(({})\)$".format("|".join(suffixes))
+        
+  
     def normalize(self,s):
         """Heuristics for stripping non-essential UMLS string clutter"""
         s = s.replace("--"," ")
@@ -334,8 +366,7 @@ class MetaNorm(object):
         s = re.sub("\-RETIRED\-$","",s).strip()
         
         # normalize TTY in [OF,FN]
-        rgx = '\((qualifier value|life style|cell structure|context\-dependent category|inactive concept|navigational concept|lck|record artifact|core metadata concept|substance|event|organism|person|attribute|procedure|tumor staging|a|cell|chloroaniline|product|specimen|observable entity|racial group|si|namespace concept|environment|social concept|ras|special concept|staging scale|geographic location|occupation|body structure|situation|physical force|trans|finding|epoxymethano|linkage concept|assessment scale|metadata|link assertion|dithiocarbamates|foundation metadata concept|disorder|morphologic abnormality|physical object|ethnic group)\)$'
-        s = re.sub(rgx,"",s).strip()
+        s = re.sub(self.of_fn_rgx,"",s).strip()
         
         # custom normalize function
         s = self.function(s)

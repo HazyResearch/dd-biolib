@@ -40,10 +40,10 @@ def build_umls_dictionaries(config,min_occur=1):
     if len(filelist) > 0:
         return
     
-    mn = MetaNorm()
+    #mn = MetaNorm()
     
     abbrv_tty = dict.fromkeys(['AA','AB','ACR'])
-    not_term_tty = dict.fromkeys(['AA','AB','ACR','AUN']) #'LPN'
+    not_term_tty = dict.fromkeys(['AA','AB','ACR','AUN']) 
     
     conn = database.MySqlConn(config.host, config.username, 
                               config.dbname, config.password)
@@ -59,7 +59,8 @@ def build_umls_dictionaries(config,min_occur=1):
         text,sty,sab,tty = row
         sty = sty.lower().replace(" ","_")
         
-        text = mn.normalize(text) # normalize to remove junk characters
+        # TODO: Move to interace so that this is done on reload
+        #text = mn.normalize(text) # normalize to remove junk characters
         
         if tty in abbrv_tty:
             abbrv[sty][sab][text] = 1
@@ -92,7 +93,7 @@ class UmlsNoiseAwareDict(object):
     to create labeling functions for providing supervision for 
     tagging tasks'''
     def __init__(self, positive=[], negative=[], name="", rm_sab=[],
-                 rootdir=None, ignore_case=True):
+                 rootdir=None, ignore_case=True, normalize=True):
         
         module_path = os.path.dirname(__file__)
         self.rootdir = rootdir if rootdir else "{}/data/cache/{}/".format(module_path,name)
@@ -101,7 +102,7 @@ class UmlsNoiseAwareDict(object):
         self.name = name
         self.encoding = "utf-8"
         self.ignore_case = ignore_case
-        self._dictionary = self._load_dictionaries()
+        self._dictionary = self._load_dictionaries(normalize)
         self.rm_sab = rm_sab
         
     
@@ -109,11 +110,13 @@ class UmlsNoiseAwareDict(object):
         return s.lower().replace(" ","_")
     
     
-    def _load_dictionaries(self):
+    def _load_dictionaries(self,normalize):
         '''Load dictionaries base on provided positive/negative 
         entity examples'''
         d = defaultdict(defaultdict)
         filelist = glob.glob("{}*.txt.bz2".format(self.rootdir))
+        
+        mn = MetaNorm()
         
         for fpath in filelist:
             fname = fpath.split("/")[-1].rstrip(".txt.bz2")
@@ -132,14 +135,19 @@ class UmlsNoiseAwareDict(object):
                         continue
                     try:
                         line = line.strip().decode('utf-8')
-                        terms += [line.strip().lower() if self.ignore_case else line.strip()]
+                        t = line.strip().lower() if self.ignore_case else line.strip()
+                        if normalize:
+                            t = mn.normalize(t)
+                        terms += [t]
                     except:
                         print>>sys.stderr,"Warning: unicode conversion error"
-                        
+            
             if sty in d and sab in d[sty]:    
                 d[sty][sab].update(dict.fromkeys(terms))
             else:
                 d[sty][sab] = dict.fromkeys(terms)
+            
+            
             
         return d    
     
@@ -156,7 +164,8 @@ class UmlsNoiseAwareDict(object):
     def get_dictionary(self,semantic_types=[],source_vocab=[], min_size=1):
         return self.dictionary(semantic_types,source_vocab, min_size)
                     
-    def dictionary(self,semantic_types=[],source_vocab=[], min_size=1):
+    def dictionary(self, semantic_types=[], source_vocab=[], min_size=1,
+                   positive_only=True):
         '''Create a single dictionary building using the provided semantic types
         and source vocabularies. If either are None, use all available types. 
         '''
@@ -169,6 +178,10 @@ class UmlsNoiseAwareDict(object):
         # filter ontologies by size and source
         d = []
         for sty in self._dictionary:
+            
+            if sty not in self.positive and positive_only:
+                continue
+            
             if sty not in semantic_types:
                 continue
             
@@ -178,8 +191,11 @@ class UmlsNoiseAwareDict(object):
                 if len(self._dictionary[sty][sab]) <= min_size:
                     continue
                 
+                if "ears" in self._dictionary[sty][sab]:
+                    print sty,sab
+                
                 d += self._dictionary[sty][sab].keys()
-        
+
         return dict.fromkeys(d)
         
         

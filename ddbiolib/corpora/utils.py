@@ -56,3 +56,9 @@ def kill_gremlins(text):
 def rm_ascii_control_chars(t):
     return re.sub(u"[\x00-\x1F]|[\x7F]", u"", t)
     
+
+def as_conll(corpus,label_key):
+    '''
+    Given a corpus and label key, generate a CoNLL format document
+    '''
+    pass
