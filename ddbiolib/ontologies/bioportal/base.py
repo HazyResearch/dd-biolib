@@ -8,9 +8,14 @@ def load_bioportal_dictionary(filename, ignore_case=True):
   
     dictionary = {}
     for line in d[1:]:
+        line = line.strip()
+        if not line:
+            continue
         row = dict(zip(d[0],line))
         pref_label = row["Preferred Label"].lower() if ignore_case else row["Preferred Label"]
         dictionary[pref_label] = 1
         dictionary.update({t.lower() if ignore_case else t:1 for t in row["Synonyms"].split("|")})
-        
+    # HACK
+    if "" in dictionary:
+        del dictionary[""]
     return dictionary
