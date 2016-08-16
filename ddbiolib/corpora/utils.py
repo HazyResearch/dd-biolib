@@ -57,8 +57,39 @@ def rm_ascii_control_chars(t):
     return re.sub(u"[\x00-\x1F]|[\x7F]", u"", t)
     
 
-def as_conll(corpus,label_key):
+def to_conll(corpus, entities, label_key):
     '''
     Given a corpus and label key, generate a CoNLL format document
     '''
-    pass
+     
+    outstr = []
+    for doc in corpus:
+       
+        print doc.attributes["annotations"]
+        
+        tagged = zip(doc["sentences"], doc["tags"])
+        
+        
+        for sentence,labels in tagged:
+            # create label index
+            idx = {}
+            for term,(i,j) in labels:
+                if i not in idx:
+                    idx[i] = {}
+                idx[i][term] = j
+            
+            # fix overlapping gold entity spans (due to tokenziation errors)
+            words = sentence.words
+            tags = [u'O'] * len(words)
+            for i in idx:
+                for label in idx[i]:
+                    bio2 = [u"<B-{}>".format(label_key)]
+                    bio2 += [u"<I-{}>".format(label_key)] * (len(label.split())-1)
+                    tags[i:idx[i][label]] = bio2
+            
+            s = zip(words,tags)
+            for word,tag in s:
+                outstr += [u"{} {}".format(word,tag)]
+            outstr += [u""] 
+            
+    return "\n".join(outstr)

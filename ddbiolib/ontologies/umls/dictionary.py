@@ -67,6 +67,8 @@ class UmlsDict(object):
             i = fname.index(".")
             sty,sab = fname[0:i], fname[i+1:].rstrip(".abbrv")
             
+            #print sty,sab
+            
             # only include specified semantic types and source vocabularies
             if self.sem_types and sty not in self.sem_types:
                 continue
@@ -83,8 +85,8 @@ class UmlsDict(object):
                         terms += [line.strip().lower() if self.ignore_case else line.strip()]
                     except:
                         print>>sys.stderr,"Warning: unicode conversion error"
-                        
-            if sty in d and sab in d[sty]:    
+                    
+            if sty in d and sab in d[sty]:                        
                 d[sty][sab].update(dict.fromkeys(terms))
             else:
                 d[sty][sab] = dict.fromkeys(terms)

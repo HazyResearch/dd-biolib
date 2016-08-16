@@ -117,4 +117,4 @@ def load_corpus(parser,entity_type="Disease"):
       
     return Corpus(doc_parser,text_parser,attributes)
 
-
+    

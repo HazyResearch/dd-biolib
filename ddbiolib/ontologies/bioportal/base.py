@@ -8,7 +8,7 @@ def load_bioportal_dictionary(filename, ignore_case=True):
   
     dictionary = {}
     for line in d[1:]:
-        line = line.strip()
+        #line = line.strip()
         if not line:
             continue
         row = dict(zip(d[0],line))
