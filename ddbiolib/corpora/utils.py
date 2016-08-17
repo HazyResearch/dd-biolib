@@ -57,39 +57,46 @@ def rm_ascii_control_chars(t):
     return re.sub(u"[\x00-\x1F]|[\x7F]", u"", t)
     
 
-def to_conll(corpus, entities, label_key):
+def to_conll(corpus, labels, label_key, doc_ids=None):
     '''
     Given a corpus and label key, generate a CoNLL format document
     '''
-     
-    outstr = []
+    # index labels by doc/sent
+    idx = {}
+    for l in labels:
+        doc_id = l.sentence["doc_id"]
+        sent_id = l.sentence["sent_id"]
+        if doc_id not in idx:
+            idx[doc_id] = {}
+        if sent_id not in idx[doc_id]:  
+            idx[doc_id][sent_id] = []
+        idx[doc_id][sent_id] += [l.idxs]
+        
+    
+    n = 0
+    sentences = []
     for doc in corpus:
-       
-        print doc.attributes["annotations"]
-        
-        tagged = zip(doc["sentences"], doc["tags"])
-        
-        
-        for sentence,labels in tagged:
-            # create label index
-            idx = {}
-            for term,(i,j) in labels:
-                if i not in idx:
-                    idx[i] = {}
-                idx[i][term] = j
+        if doc_ids and doc.doc_id not in doc_ids:
+            continue
+        for i,sent in enumerate(doc.sentences):
+            tags = len(sent.words) * ['O']
+            if sent.doc_id in idx and i in idx[sent.doc_id]:
+                labels = idx[sent.doc_id][i]
+                for lbl in labels:
+                    t  = [u"B-{}".format(label_key)]
+                    t += [u"I-{}".format(label_key)] * (len(lbl)-1)
+                    tags[min(lbl):max(lbl)+1] = t
+                    n += 1
+            # HACK unicode whitespace character fix (for conlleval script compatibility)
+            words = map(lambda x:x.replace(u'\xa0',u'_'), sent.words)
+            sentences += [zip(words,tags) ]
+           
             
-            # fix overlapping gold entity spans (due to tokenziation errors)
-            words = sentence.words
-            tags = [u'O'] * len(words)
-            for i in idx:
-                for label in idx[i]:
-                    bio2 = [u"<B-{}>".format(label_key)]
-                    bio2 += [u"<I-{}>".format(label_key)] * (len(label.split())-1)
-                    tags[i:idx[i][label]] = bio2
-            
-            s = zip(words,tags)
-            for word,tag in s:
-                outstr += [u"{} {}".format(word,tag)]
-            outstr += [u""] 
-            
+    outstr = []       
+    for sent in sentences:
+        outstr += ["\n".join(map(lambda x: u"{} {}".format(*x),sent))]
+        outstr += [""]
+    
+    print n
     return "\n".join(outstr)
+

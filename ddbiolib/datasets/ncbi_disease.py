@@ -114,7 +114,7 @@ def load_corpus(parser):
     attributes = {"sets":{"testing":[],"training":[],"development":[]}}
     for pmid in doc_parser._docs:
         setname = doc_parser._docs[pmid].attributes["set"]
-        attributes["sets"][setname]+= [pmid]
+        attributes["sets"][setname] += [pmid]
       
     return Corpus(doc_parser,text_parser,attributes)
 
