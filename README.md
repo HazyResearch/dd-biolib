@@ -1,6 +1,6 @@
-# DeepDive Biomedical Library
+# Snorkel Biomedical Tools
 
-This module consists of tools for iterating over biomedical document collections, interacting with biomedical ontologies, and creating dictionaries for labeling entity candidates. 
+This module consists of Snorkel tools for iterating over biomedical document collections, interacting with biomedical ontologies, and creating dictionaries for labeling entities.
 
 ## Installing ddbiolib
 
@@ -33,28 +33,3 @@ source .virtualenv/bin/activate
 
 pip install --requirement python-package-requirement.txt
 ```
-
-
-## Jupyter Notebooks
-
-### UMLS Metathesauraus Tools 
-`examples/UmlsMetathesaurus.ipynb`
-
-This notebook provides an overview of how to interact with the UMLS for 
-creating dictionaries or accessing concepts and their synonym sets, navigating
-onotologies, etc. 
-
-See the dd-bio-examples repo for some example taggers
-
-
-
-
-
-
-
-
-
-### Corpus Tools
-
-We provide 2 basic corpus object for iterating and parsing document collections: `PubMedAbstractCorpus` for PubMed Abstracts and `PubMedCentralCorpus` for XML documents from the [PMC Open Access Subset](http://www.ncbi.nlm.nih.gov/pmc/tools/ftp/). Please see
-`ddbiolib/examples` for examples of how to use these objects. 

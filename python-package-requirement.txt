@@ -1,5 +1,5 @@
-mysql-connector-python
+mysql-connector
 psycopg2
 networkx
 sklearn
-gensim
+unicodecsv
