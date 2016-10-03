@@ -22,11 +22,12 @@ from ...utils import database
 from .config import DEFAULT_UMLS_CONFIG
 from .metathesaurus import MetaNorm
 
-def dict_function_factory(dictionary,rvalue,name,ignore_case=True):
+def dict_function_factory(dictionary,rvalue,name,ignore_case=True,stopwords={}):
     '''Dynamically create a labeling function object'''
     def function_template(m):
-        mention = " ".join(m.get_attrib_tokens('words')).lower() if ignore_case else " ".join(m.get_attrib_tokens('words'))
-        return rvalue if mention in dictionary else 0
+        #mention = " ".join(m.get_attrib_tokens('words')).lower() if ignore_case else " ".join(m.get_attrib_tokens('words'))
+        mention = " ".join(m.get_attrib_span('words')).lower() if ignore_case else " ".join(m.get_attrib_span('words'))
+        return rvalue if (mention in dictionary and mention not in stopwords) else 0
     function_template.__name__ = name
     return function_template
 
@@ -93,7 +94,7 @@ class UmlsNoiseAwareDict(object):
     to create labeling functions for providing supervision for 
     tagging tasks'''
     def __init__(self, positive=[], negative=[], name="", rm_sab=[],
-                 rootdir=None, ignore_case=True, normalize=True):
+                 rootdir=None, ignore_case=True, normalize=True, stopwords={}):
         
         module_path = os.path.dirname(__file__)
         self.rootdir = rootdir if rootdir else "{}/data/cache/{}/".format(module_path,name)
@@ -102,6 +103,7 @@ class UmlsNoiseAwareDict(object):
         self.name = name
         self.encoding = "utf-8"
         self.ignore_case = ignore_case
+        self.stopwords = stopwords
         self._dictionary = self._load_dictionaries(normalize)
         self.rm_sab = rm_sab
         
@@ -127,7 +129,7 @@ class UmlsNoiseAwareDict(object):
             # skip semantic types we don't flag as postive of negative
             if sty not in self.positive and sty not in self.negative:
                 continue
-            
+           
             terms = []
             with bz2.BZ2File(fpath,"rb") as f:
                 for line in f:
@@ -135,13 +137,15 @@ class UmlsNoiseAwareDict(object):
                         continue
                     try:
                         line = line.strip().decode('utf-8')
-                        t = line.strip().lower() if self.ignore_case else line.strip()
                         if normalize:
-                            t = mn.normalize(t)
-                        terms += [t]
+                            line = mn.apply(line)
+                        
+                        t = line.lower() if self.ignore_case else line
+                        if t != "" and t.lower() not in self.stopwords:
+                            terms += [t]
                     except:
                         print>>sys.stderr,"Warning: unicode conversion error"
-            
+                        
             if sty in d and sab in d[sty]:    
                 d[sty][sab].update(dict.fromkeys(terms))
             else:
@@ -199,7 +203,7 @@ class UmlsNoiseAwareDict(object):
         return dict.fromkeys(d)
         
         
-    def lfs(self,min_size=0):
+    def lfs(self, min_size=0, stopwords={}):
         '''Create labeling functions for each semantic type/source vocabulary'''
         for sty in self._dictionary:
             for sab in self._dictionary[sty]:
@@ -214,7 +218,7 @@ class UmlsNoiseAwareDict(object):
                 func_name = "LF_{}{}_{}_{}".format(prefix,sty,sab,label)
                 rvalue = 1 if label=="pos" else -1
                 yield dict_function_factory(self._dictionary[sty][sab],rvalue,
-                                            func_name,self.ignore_case)
+                                            func_name,self.ignore_case,stopwords)
                 
 
 if __name__ == "__main__":

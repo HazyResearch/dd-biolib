@@ -1,5 +1,6 @@
 import re
 import os
+import string
 import networkx as nx
 from ...utils import database
 from .config import DEFAULT_UMLS_CONFIG
@@ -335,7 +336,7 @@ class MetaNorm(TextNorm):
     """
     def __init__(self, function=lambda x:x):
         super(MetaNorm, self).__init__(function)
-        
+        #self.counter = 100
         # TTY in [OF,FN] suffixes
         suffixes = ['qualifier value', 'life style', 'cell structure', 
                      'context\\-dependent category', 'inactive concept', 
@@ -367,6 +368,9 @@ class MetaNorm(TextNorm):
         
         # normalize TTY in [OF,FN]
         s = re.sub(self.of_fn_rgx,"",s).strip()
+        
+        # remove digits/stray punctuation
+        s = re.sub("^([0-9]+[{}]*)+$".format(string.punctuation),"",s).strip()
         
         # custom normalize function
         s = self.function(s)

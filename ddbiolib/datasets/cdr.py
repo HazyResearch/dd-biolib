@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import glob
 import codecs
@@ -8,6 +9,37 @@ from ..utils import download
 from ..corpora import Corpus,Document,DocParser
 from ..parsers import PickleSerializedParser
 
+
+class Annotation(object):
+    
+    def __init__(self, text_type, start, end, text, mention_type):
+        self.text_type = text_type
+        self.start = start
+        self.end = end
+        self.text = text
+        self.mention_type = mention_type
+
+    def __str__(self):
+        return "Annotation(start={}, end={}, text={})".format(self.start,self.end,self.text)
+
+def align(a, b):
+    j = 0
+    offsets = []
+    for i in range(0,len(a)):
+        if a[i] in [" "]:
+            continue
+      
+        matched = False
+        while not matched and j < len(b):
+            if a[i] == b[j]:
+                offsets += [(i,j,a[i],b[j])]
+                matched = True
+            j += 1
+            
+    token_idx, doc_idx, token_ch, doc_ch = zip(*offsets)
+    #return offsets,dict(zip(doc_idx,token_idx))
+    return offsets,dict(zip(token_idx,doc_idx))
+
 class CdrParser(DocParser):
     '''
         The CDR disease corpus 
@@ -16,8 +48,9 @@ class CdrParser(DocParser):
         X disease mentions
         X chemical mentions
     '''
-    def __init__(self, inputpath=None, entity_type="Disease"):
+    def __init__(self, inputpath=None, entity_type="Disease", split_chars=[]):
         super(CdrParser, self).__init__(inputpath, "utf-8")
+        self.split_chars = split_chars
         if not inputpath:
             self.inputpath = "{}/data/CDR.Corpus.v010516/".format(os.path.dirname(__file__))
         else:
@@ -33,7 +66,7 @@ class CdrParser(DocParser):
 
     def _preload(self, et):
         '''Load entire corpus into memory'''
-        Annotation = namedtuple('Annotation', ['text_type','start','end','text','mention_type'])
+        
         
         cvdefs = {"CDR_DevelopmentSet.PubTator.txt":"development",
                   "CDR_TestSet.PubTator.txt":"testing",
@@ -61,6 +94,7 @@ class CdrParser(DocParser):
             for doc in documents:
                 pmid,title,abstract = doc[0][0],doc[0][2],doc[1][2]
                 text = "%s %s" % (title, abstract)
+                
                 attributes = {"set":setname,"title":title,"abstract":abstract}            
                 attributes["annotations"] = []
                 
@@ -89,7 +123,26 @@ class CdrParser(DocParser):
                         continue
                     label = Annotation(text_type, start, end, mention, mention_type)
                     attributes["annotations"] += [label]
-
+                
+                #
+                # Force tokenization on certain characters BEFORE parsing
+                #
+                if self.split_chars:
+                    rgx = "([{}])".format("".join(self.split_chars))
+                    t_text = re.sub(rgx, r" \1 ", text)
+                    t_text = re.sub("\s{2,}"," ",t_text)
+                    text += " " * (len(t_text) - len(text))
+                    _, char_mapping = align(text,t_text)
+                    
+                    for label in attributes["annotations"]:
+                        if label.start != char_mapping[label.start]:
+                            label.start = char_mapping[label.start]
+                            label_text = re.sub(rgx, r" \1 ", label.text)
+                            label_text = re.sub("\s{2,}"," ",label_text)
+                            label.end = label.start + len(label_text)
+                    
+                    text = t_text
+                    
                 doc = Document(pmid,text,attributes=attributes)
                 self._docs[pmid] = doc
     
@@ -101,12 +154,12 @@ class CdrParser(DocParser):
             yield self._docs[pmid]
 
 
-def load_corpus(parser,entity_type="Disease"):
+def load_corpus(parser,entity_type="Disease",split_chars=[]):
     '''Load CDR Disease Corpus
     '''
     # init cache directory and parsers
     cache_dir = "{}/data/CDR.Corpus.v010516/cache/".format(os.path.dirname(__file__))
-    doc_parser = CdrParser(entity_type=entity_type)
+    doc_parser = CdrParser(entity_type=entity_type,split_chars=split_chars)
     text_parser = PickleSerializedParser(parser,rootdir=cache_dir)
     
     # create cross-validation set information
