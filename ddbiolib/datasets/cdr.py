@@ -154,11 +154,16 @@ class CdrParser(DocParser):
             yield self._docs[pmid]
 
 
-def load_corpus(parser,entity_type="Disease",split_chars=[]):
+def load_corpus(parser,entity_type="Disease",split_chars=[],overwrite=True):
     '''Load CDR Disease Corpus
     '''
     # init cache directory and parsers
     cache_dir = "{}/data/CDR.Corpus.v010516/cache/".format(os.path.dirname(__file__))
+    if overwrite:
+        filelist = glob.glob("{}/*.pkl".format(cache_dir))
+        for fn in filelist:
+            os.remove(fn)
+        
     doc_parser = CdrParser(entity_type=entity_type,split_chars=split_chars)
     text_parser = PickleSerializedParser(parser,rootdir=cache_dir)
     

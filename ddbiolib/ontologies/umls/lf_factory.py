@@ -25,8 +25,7 @@ from .metathesaurus import MetaNorm
 def dict_function_factory(dictionary,rvalue,name,ignore_case=True,stopwords={}):
     '''Dynamically create a labeling function object'''
     def function_template(m):
-        #mention = " ".join(m.get_attrib_tokens('words')).lower() if ignore_case else " ".join(m.get_attrib_tokens('words'))
-        mention = " ".join(m.get_attrib_span('words')).lower() if ignore_case else " ".join(m.get_attrib_span('words'))
+        mention = m.get_attrib_span('words').lower() if ignore_case else m.get_attrib_span('words')
         return rvalue if (mention in dictionary and mention not in stopwords) else 0
     function_template.__name__ = name
     return function_template
@@ -205,6 +204,7 @@ class UmlsNoiseAwareDict(object):
         
     def lfs(self, min_size=0, stopwords={}):
         '''Create labeling functions for each semantic type/source vocabulary'''
+        
         for sty in self._dictionary:
             for sab in self._dictionary[sty]:
                 if sab in self.rm_sab:
