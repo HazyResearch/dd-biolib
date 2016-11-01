@@ -137,7 +137,13 @@ class UmlsNoiseAwareDict(object):
                     try:
                         line = line.strip().decode('utf-8')
                         if normalize:
+                            d_line = line
                             line = mn.apply(line)
+                            # normalized form is too short -- skip
+                            if len(line)/float(len(d_line)) < 0.2:
+                                #print "SKIPPING", d_line, "-->", line
+                                line = ""
+
                         
                         t = line.lower() if self.ignore_case else line
                         if t != "" and t.lower() not in self.stopwords:

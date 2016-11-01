@@ -66,11 +66,12 @@ class CdrParser(DocParser):
 
     def _preload(self, et):
         '''Load entire corpus into memory'''
-        
-        
+
         cvdefs = {"CDR_DevelopmentSet.PubTator.txt":"development",
                   "CDR_TestSet.PubTator.txt":"testing",
-                  "CDR_TrainingSet.PubTator.txt":"training"}
+                  "CDR_TrainingSet.PubTator.txt":"training",
+                  "pubmed.unlabled.10000.txt": "unlabeled-10k"
+                  }
         
         filelist = glob.glob("%s/*.txt" % self.inputpath)
 
@@ -103,7 +104,7 @@ class CdrParser(DocParser):
                     
                     # relation
                     # ----------------------------
-                    if len(row) <= 4:# or row[4] == "Chemical":
+                    if len(row) <= 4:
                         pmid,rela,m1,m2 = row
                         continue
                     
@@ -154,7 +155,7 @@ class CdrParser(DocParser):
             yield self._docs[pmid]
 
 
-def load_corpus(parser,entity_type="Disease",split_chars=[],overwrite=True):
+def load_corpus(parser,entity_type="Disease",split_chars=[],overwrite=False):
     '''Load CDR Disease Corpus
     '''
     # init cache directory and parsers
@@ -168,7 +169,8 @@ def load_corpus(parser,entity_type="Disease",split_chars=[],overwrite=True):
     text_parser = PickleSerializedParser(parser,rootdir=cache_dir)
     
     # create cross-validation set information
-    attributes = {"sets":{"testing":[],"training":[],"development":[]}}
+    attributes = {"sets":{"testing":[],"training":[],"development":[],
+                          "unlabeled-10k":[]}}
     for pmid in doc_parser._docs:
         setname = doc_parser._docs[pmid].attributes["set"]
         attributes["sets"][setname]+= [pmid]
