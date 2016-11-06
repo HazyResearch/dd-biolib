@@ -12,12 +12,13 @@ from ..parsers import PickleSerializedParser
 
 class Annotation(object):
     
-    def __init__(self, text_type, start, end, text, mention_type):
+    def __init__(self, text_type, start, end, text, mention_type, uids=[]):
         self.text_type = text_type
         self.start = start
         self.end = end
         self.text = text
         self.mention_type = mention_type
+        self.uids = uids
 
     def __str__(self):
         return "Annotation(start={}, end={}, text={})".format(self.start,self.end,self.text)
@@ -48,7 +49,7 @@ class CdrParser(DocParser):
         X disease mentions
         X chemical mentions
     '''
-    def __init__(self, inputpath=None, entity_type="Disease", split_chars=[]):
+    def __init__(self, inputpath=None, entity_type="Disease", split_chars=[], use_unlabeled=False):
         super(CdrParser, self).__init__(inputpath, "utf-8")
         self.split_chars = split_chars
         if not inputpath:
@@ -59,12 +60,12 @@ class CdrParser(DocParser):
         # download CDR data
         if not os.path.exists(self.inputpath):
             self._download()
-        self._preload(entity_type)
+        self._preload(entity_type,use_unlabeled)
         
     def _download(self):
         print>>sys.stderr,"CDR files require a Biocreative account. See http://www.biocreative.org/accounts/register/"
 
-    def _preload(self, et):
+    def _preload(self, et, use_unlabeled=False):
         '''Load entire corpus into memory'''
 
         cvdefs = {"CDR_DevelopmentSet.PubTator.txt":"development",
@@ -72,11 +73,17 @@ class CdrParser(DocParser):
                   "CDR_TrainingSet.PubTator.txt":"training",
                   "pubmed.unlabled.10000.txt": "unlabeled-10k"
                   }
+
+        if not use_unlabeled:
+            del cvdefs["pubmed.unlabled.10000.txt"]
         
         filelist = glob.glob("%s/*.txt" % self.inputpath)
 
         for fname in filelist:
-            setname = cvdefs[fname.split("/")[-1]]
+            name = fname.split("/")[-1]
+            if name not in cvdefs:
+                continue
+            setname = cvdefs[name]
             documents = []
             with codecs.open(fname,"rU",self.encoding) as f:
                 doc = []
@@ -122,7 +129,7 @@ class CdrParser(DocParser):
 
                     if mention_type != et:
                         continue
-                    label = Annotation(text_type, start, end, mention, mention_type)
+                    label = Annotation(text_type, start, end, mention, mention_type, duid)
                     attributes["annotations"] += [label]
                 
                 #
@@ -146,7 +153,8 @@ class CdrParser(DocParser):
                     
                 doc = Document(pmid,text,attributes=attributes)
                 self._docs[pmid] = doc
-    
+
+
     def __getitem__(self,key):
         return self._docs[key]
     
@@ -155,7 +163,7 @@ class CdrParser(DocParser):
             yield self._docs[pmid]
 
 
-def load_corpus(parser,entity_type="Disease",split_chars=[],overwrite=False):
+def load_corpus(parser, entity_type="Disease",split_chars=[], overwrite=False, use_unlabeled=False):
     '''Load CDR Disease Corpus
     '''
     # init cache directory and parsers
@@ -165,8 +173,8 @@ def load_corpus(parser,entity_type="Disease",split_chars=[],overwrite=False):
         for fn in filelist:
             os.remove(fn)
         
-    doc_parser = CdrParser(entity_type=entity_type,split_chars=split_chars)
-    text_parser = PickleSerializedParser(parser,rootdir=cache_dir)
+    doc_parser = CdrParser(entity_type=entity_type,split_chars=split_chars, use_unlabeled=use_unlabeled)
+    text_parser = PickleSerializedParser(parser, rootdir=cache_dir)
     
     # create cross-validation set information
     attributes = {"sets":{"testing":[],"training":[],"development":[],
@@ -174,7 +182,7 @@ def load_corpus(parser,entity_type="Disease",split_chars=[],overwrite=False):
     for pmid in doc_parser._docs:
         setname = doc_parser._docs[pmid].attributes["set"]
         attributes["sets"][setname]+= [pmid]
-      
+
     return Corpus(doc_parser,text_parser,attributes)
 
     
