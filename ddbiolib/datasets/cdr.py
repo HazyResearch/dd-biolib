@@ -71,11 +71,17 @@ class CdrParser(DocParser):
         cvdefs = {"CDR_DevelopmentSet.PubTator.txt":"development",
                   "CDR_TestSet.PubTator.txt":"testing",
                   "CDR_TrainingSet.PubTator.txt":"training",
-                  "pubmed.unlabled.10000.txt": "unlabeled-10k"
+                  #"pubmed.unlabled.10000.txt": "unlabeled-10k",
+                  #"pubmed.random.100000.txt": "random-100k",
+                  "pubmed.query.100000.txt": "query-100k"
                   }
 
         if not use_unlabeled:
-            del cvdefs["pubmed.unlabled.10000.txt"]
+            #for n in [1000,2000,4000,6000,8000,10000]:#25000,50000,75000]:
+            #    cvdefs["pubmed.query.{}.txt".format(n)] = "query-{}k".format(n)
+
+            #del cvdefs["pubmed.random.100000.txt"]
+            del cvdefs["pubmed.query.100000.txt"]
         
         filelist = glob.glob("%s/*.txt" % self.inputpath)
 
@@ -163,7 +169,7 @@ class CdrParser(DocParser):
             yield self._docs[pmid]
 
 
-def load_corpus(parser, entity_type="Disease",split_chars=[], overwrite=False, use_unlabeled=False):
+def load_corpus(parser, entity_type="Disease", split_chars=[], overwrite=False, use_unlabeled=False):
     '''Load CDR Disease Corpus
     '''
     # init cache directory and parsers
@@ -178,7 +184,8 @@ def load_corpus(parser, entity_type="Disease",split_chars=[], overwrite=False, u
     
     # create cross-validation set information
     attributes = {"sets":{"testing":[],"training":[],"development":[],
-                          "unlabeled-10k":[]}}
+                          "query-100k":[]}}
+
     for pmid in doc_parser._docs:
         setname = doc_parser._docs[pmid].attributes["set"]
         attributes["sets"][setname]+= [pmid]
