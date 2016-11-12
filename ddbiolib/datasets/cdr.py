@@ -71,16 +71,12 @@ class CdrParser(DocParser):
         cvdefs = {"CDR_DevelopmentSet.PubTator.txt":"development",
                   "CDR_TestSet.PubTator.txt":"testing",
                   "CDR_TrainingSet.PubTator.txt":"training",
-                  #"pubmed.unlabled.10000.txt": "unlabeled-10k",
-                  #"pubmed.random.100000.txt": "random-100k",
+                  "pubmed.random.100000.txt": "random-100k",
                   "pubmed.query.100000.txt": "query-100k"
                   }
 
         if not use_unlabeled:
-            #for n in [1000,2000,4000,6000,8000,10000]:#25000,50000,75000]:
-            #    cvdefs["pubmed.query.{}.txt".format(n)] = "query-{}k".format(n)
-
-            #del cvdefs["pubmed.random.100000.txt"]
+            del cvdefs["pubmed.random.100000.txt"]
             del cvdefs["pubmed.query.100000.txt"]
         
         filelist = glob.glob("%s/*.txt" % self.inputpath)
@@ -160,7 +156,6 @@ class CdrParser(DocParser):
                 doc = Document(pmid,text,attributes=attributes)
                 self._docs[pmid] = doc
 
-
     def __getitem__(self,key):
         return self._docs[key]
     
@@ -184,7 +179,7 @@ def load_corpus(parser, entity_type="Disease", split_chars=[], overwrite=False, 
     
     # create cross-validation set information
     attributes = {"sets":{"testing":[],"training":[],"development":[],
-                          "query-100k":[]}}
+                          "random-100k":[],"query-100k":[]}}
 
     for pmid in doc_parser._docs:
         setname = doc_parser._docs[pmid].attributes["set"]
