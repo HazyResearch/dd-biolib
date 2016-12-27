@@ -39,8 +39,8 @@ class SerializedParser(object):
             try:
                 sents = [s for s in self.parser.parse(s,doc_id=doc_id)]
             except Exception as e:
-                print "Fatal Parser Error {} {}".format(doc_id,e)
-                sys.exit()
+                print>>sys.stderr,"Warning Parser Error {} {}".format(doc_id,e)
+                sents = []
             self._write(sents,doc_id)
         
         self.doc_cache[doc_id] = 0   

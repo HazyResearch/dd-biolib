@@ -199,10 +199,7 @@ class UmlsNoiseAwareDict(object):
                     continue
                 if len(self._dictionary[sty][sab]) <= min_size:
                     continue
-                
-                if "ears" in self._dictionary[sty][sab]:
-                    print sty,sab
-                
+
                 d += self._dictionary[sty][sab].keys()
 
         return dict.fromkeys(d)

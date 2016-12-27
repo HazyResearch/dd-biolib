@@ -72,12 +72,12 @@ class CdrParser(DocParser):
                   "CDR_TestSet.PubTator.txt":"testing",
                   "CDR_TrainingSet.PubTator.txt":"training",
                   "pubmed.random.100000.txt": "random-100k",
-                  "pubmed.query.100000.txt": "query-100k"
+                  #"pubmed.query.100000.txt": "query-100k"
                   }
 
         if not use_unlabeled:
             del cvdefs["pubmed.random.100000.txt"]
-            del cvdefs["pubmed.query.100000.txt"]
+            #del cvdefs["pubmed.query.100000.txt"]
         
         filelist = glob.glob("%s/*.txt" % self.inputpath)
 
