@@ -18,7 +18,10 @@ class Corpus(object):
             yield doc
     
     def get_sentences(self,doc_ids=None):
-        sentences = [doc.sentences for doc in self if not doc_ids or doc.doc_id in doc_ids]
+        if doc_ids:
+            sentences = [self.__getitem__(doc_id).sentences for doc_id in doc_ids]
+        else:
+            sentences = [doc.sentences for doc in self] #if not doc_ids or doc.doc_id in doc_ids
         return list(itertools.chain.from_iterable(sentences)) 
 
 
