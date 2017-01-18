@@ -169,10 +169,10 @@ def load_corpus(parser, entity_type="Disease", split_chars=[], overwrite=False, 
     '''
     # init cache directory and parsers
     cache_dir = "{}/data/CDR.Corpus.v010516/cache/".format(os.path.dirname(__file__))
-    if overwrite:
-        filelist = glob.glob("{}/*.pkl".format(cache_dir))
-        for fn in filelist:
-            os.remove(fn)
+    #if overwrite:
+    #    filelist = glob.glob("{}/*.pkl".format(cache_dir))
+    #    for fn in filelist:
+    #        os.remove(fn)
         
     doc_parser = CdrParser(entity_type=entity_type,split_chars=split_chars, use_unlabeled=use_unlabeled)
     text_parser = PickleSerializedParser(parser, rootdir=cache_dir)

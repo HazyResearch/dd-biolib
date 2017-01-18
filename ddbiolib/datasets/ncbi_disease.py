@@ -19,15 +19,17 @@ class NcbiDiseaseParser(DocParser):
         790 unique disease concepts
     
     '''
-    def __init__(self, inputpath=None):
+    def __init__(self, inputpath=None, split_chars=[], use_unlabeled=False):
         super(NcbiDiseaseParser, self).__init__(inputpath, "utf-8")
+        self.split_chars = split_chars
+
         if not inputpath:
             self.inputpath = "{}/data/ncbi_disease_corpus/".format(os.path.dirname(__file__))
         else:
             self.inputpath = inputpath
         self._docs = {}
         self._download()
-        self._preload()
+        self._preload(use_unlabeled)
         
     def _download(self):
         '''If corpus files aren't available, automatically download them'''
@@ -46,17 +48,23 @@ class NcbiDiseaseParser(DocParser):
             subprocess.call(["unzip", outfname])
             os.chdir(cwd)
             
-    def _preload(self):
+    def _preload(self, use_unlabeled=False):
         '''Load corpus into memory'''
         Annotation = namedtuple('Annotation', ['text_type','start','end','text','mention_type'])
         
         # holdout set definitions
         cvdefs = {"NCBIdevelopset_corpus.txt":"development",
                   "NCBItestset_corpus.txt":"testing",
-                  "NCBItrainset_corpus.txt":"training"}
-        
-        filelist = glob.glob("%s/*.txt" % self.inputpath)
+                  "NCBItrainset_corpus.txt":"training",
+                  "pubmed.random.100000.txt": "random-100k",
+                  # "pubmed.query.100000.txt": "query-100k"
+                  }
 
+        if not use_unlabeled:
+            del cvdefs["pubmed.random.100000.txt"]
+            #del cvdefs["pubmed.query.100000.txt"]
+
+        filelist = glob.glob("%s/*.txt" % self.inputpath)
         for fname in filelist:
             setname = cvdefs[fname.split("/")[-1]]
             documents = []
@@ -102,20 +110,21 @@ class NcbiDiseaseParser(DocParser):
             yield self._docs[pmid]
 
 
-def load_corpus(parser):
-    '''Load NCBI Disease Corpus
-    '''
+def load_corpus(parser, entity_type="Disease", split_chars=[], overwrite=False, use_unlabeled=False):
+
     # init cache directory and parsers
     cache_dir = "{}/data/ncbi_disease_corpus/cache/".format(os.path.dirname(__file__))
     doc_parser = NcbiDiseaseParser()
     text_parser = PickleSerializedParser(parser,rootdir=cache_dir)
     
     # create cross-validation set information
-    attributes = {"sets":{"testing":[],"training":[],"development":[]}}
+    attributes = {"sets":{"testing":[],"training":[],"development":[],
+                          "random-100k": [], "query-100k": []}}
     for pmid in doc_parser._docs:
         setname = doc_parser._docs[pmid].attributes["set"]
         attributes["sets"][setname] += [pmid]
       
     return Corpus(doc_parser,text_parser,attributes)
+
 
 
