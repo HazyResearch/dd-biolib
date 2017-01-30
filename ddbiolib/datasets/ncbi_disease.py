@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import glob
 import codecs
@@ -7,6 +8,24 @@ from collections import namedtuple
 from ..utils import download
 from ..corpora import Corpus,Document,DocParser
 from ..parsers import PickleSerializedParser
+
+
+def align(a, b):
+    j = 0
+    offsets = []
+    for i in range(0, len(a)):
+        if a[i] in [" "]:
+            continue
+
+        matched = False
+        while not matched and j < len(b):
+            if a[i] == b[j]:
+                offsets += [(i, j, a[i], b[j])]
+                matched = True
+            j += 1
+
+    token_idx, doc_idx, token_ch, doc_ch = zip(*offsets)
+    return offsets, dict(zip(token_idx, doc_idx))
 
 class NcbiDiseaseParser(DocParser):
     '''
@@ -27,6 +46,7 @@ class NcbiDiseaseParser(DocParser):
             self.inputpath = "{}/data/ncbi_disease_corpus/".format(os.path.dirname(__file__))
         else:
             self.inputpath = inputpath
+        print self.inputpath
         self._docs = {}
         self._download()
         self._preload(use_unlabeled)
@@ -56,17 +76,96 @@ class NcbiDiseaseParser(DocParser):
         cvdefs = {"NCBIdevelopset_corpus.txt":"development",
                   "NCBItestset_corpus.txt":"testing",
                   "NCBItrainset_corpus.txt":"training",
-                  "pubmed.random.100000.txt": "random-100k",
-                  # "pubmed.query.100000.txt": "query-100k"
+                  "pubmed.random.100000.txt": "random-100k"
                   }
 
         if not use_unlabeled:
             del cvdefs["pubmed.random.100000.txt"]
-            #del cvdefs["pubmed.query.100000.txt"]
 
         filelist = glob.glob("%s/*.txt" % self.inputpath)
+
         for fname in filelist:
-            setname = cvdefs[fname.split("/")[-1]]
+            name = fname.split("/")[-1]
+            if name not in cvdefs:
+                continue
+            setname = cvdefs[name]
+            documents = []
+            with codecs.open(fname, "rU", self.encoding) as f:
+                doc = []
+                for line in f:
+                    row = line.strip()
+                    if not row and doc:
+                        documents += [doc]
+                        doc = []
+                    elif row:
+                        row = row.split("|") if (len(row.split("|")) > 1 and
+                                                 row.split("|")[1] in ["t", "a"]) else row.split("\t")
+                        doc += [row]
+                if doc:
+                    documents += [doc]
+
+            for doc in documents:
+                pmid, title, abstract = doc[0][0], doc[0][2], doc[1][2]
+                text = "%s %s" % (title, abstract)
+
+                attributes = {"set": setname, "title": title, "abstract": abstract}
+                attributes["annotations"] = []
+
+                # load annotation tuples
+                for row in doc[2:]:
+
+                    # relation
+                    # ----------------------------
+                    if len(row) <= 4:
+                        pmid, rela, m1, m2 = row
+                        continue
+
+                    # entity
+                    # ----------------------------
+                    if len(row) == 6:
+                        pmid, start, end, mention, mention_type, duid = row
+                        norm_names = []
+                    elif len(row) == 7:
+                        pmid, start, end, mention, mention_type, duid, norm_names = row
+                    duid = duid.split("|")
+
+                    start, end = int(start), int(end)
+                    text_type = "T" if end <= len(title) else "A"
+
+                    label = Annotation(text_type, start, end, mention, mention_type)
+                    attributes["annotations"] += [label]
+
+                #
+                # Force tokenization on certain characters BEFORE parsing
+                #
+                if self.split_chars:
+                    rgx = "([{}])".format("".join(self.split_chars))
+                    t_text = re.sub(rgx, r" \1 ", text)
+                    t_text = re.sub("\s{2,}", " ", t_text)
+                    text += " " * (len(t_text) - len(text))
+                    _, char_mapping = align(text, t_text)
+
+                    for label in attributes["annotations"]:
+                        if label.start != char_mapping[label.start]:
+                            label.start = char_mapping[label.start]
+                            label_text = re.sub(rgx, r" \1 ", label.text)
+                            label_text = re.sub("\s{2,}", " ", label_text)
+                            label.end = label.start + len(label_text)
+
+                    text = t_text
+
+                doc = Document(pmid, text, attributes=attributes)
+                self._docs[pmid] = doc
+
+        '''
+        filelist = glob.glob("%s/*.txt" % self.inputpath)
+        print len(filelist)
+        for fname in filelist:
+            name = fname.split("/")[-1]
+            if name not in cvdefs:
+                continue
+            setname = cvdefs[name]
+
             documents = []
             with codecs.open(fname,"rU",self.encoding) as f:
                 doc = []
@@ -101,7 +200,8 @@ class NcbiDiseaseParser(DocParser):
                     
                 doc = Document(pmid,text,attributes=attributes)
                 self._docs[pmid] = doc
-    
+        '''
+
     def __getitem__(self,key):
         return self._docs[key]
     
@@ -114,8 +214,8 @@ def load_corpus(parser, entity_type="Disease", split_chars=[], overwrite=False, 
 
     # init cache directory and parsers
     cache_dir = "{}/data/ncbi_disease_corpus/cache/".format(os.path.dirname(__file__))
-    doc_parser = NcbiDiseaseParser()
-    text_parser = PickleSerializedParser(parser,rootdir=cache_dir)
+    doc_parser = NcbiDiseaseParser(split_chars=split_chars, use_unlabeled=use_unlabeled)
+    text_parser = PickleSerializedParser(parser, rootdir=cache_dir)
     
     # create cross-validation set information
     attributes = {"sets":{"testing":[],"training":[],"development":[],
@@ -123,7 +223,8 @@ def load_corpus(parser, entity_type="Disease", split_chars=[], overwrite=False, 
     for pmid in doc_parser._docs:
         setname = doc_parser._docs[pmid].attributes["set"]
         attributes["sets"][setname] += [pmid]
-      
+
+    print "Loaded NCBI Disease corpus"
     return Corpus(doc_parser,text_parser,attributes)
 
 
