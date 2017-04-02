@@ -5,6 +5,7 @@ import glob
 import codecs
 import tarfile
 import subprocess
+import numpy as np
 from collections import namedtuple,defaultdict
 from ddbiolib.utils import download
 from ddbiolib.corpora import Corpus, Document, DocParser
@@ -88,52 +89,9 @@ def annotation_parser(f, rm_tags=[]):
     return annotations
 
 
-def annotate_doc(annotations, doc, uid):
-    '''
-    Create document sequence and labels. i2b2 offsets
-    are of the form <LINE>:<TOKEN> where LINE offsets begin
-    at 1 and TOKEN offsets begin at 0 (ugh).
-    Use IOB format (inside, outside, beginning)
-    Example medication mention
-    B-m, I-m, O
-    '''
-    labels = [['O' for _ in line] for line in doc]
+def annotate_doc(annotations, sents, uid):
 
-    for mention in annotations:
-        for item in mention:
-
-            entity_label = item[0]
-
-            # if there is a mention, determine the text span
-            if item[-1]:
-
-                for offset in item[-1]:
-                    begin, end = offset
-
-                    if begin[0] != end[0]:
-                        span_n = len(doc[begin[0] - 1][begin[1]:])
-                        span_n += len(doc[end[0] - 1][:end[1] + 1])
-
-                        # generate IOB labels
-                        span = ["I-%s" % entity_label] * span_n
-                        span[0] = "B-%s" % entity_label
-
-                        span_n = len(doc[begin[0] - 1][begin[1]:])
-                        labels[begin[0] - 1][begin[1]:] = span[0:span_n]
-                        labels[end[0] - 1][:end[1] + 1] = span[span_n:]
-
-                    else:
-                        # generate IOB labels
-                        span = ["I-%s" % entity_label] * (end[1] - begin[1] + 1)
-                        span[0] = "B-%s" % entity_label
-                        labels[begin[0] - 1][begin[1]:end[1] + 1] = span
-
-    return labels
-
-
-
-def annotate_doc_2(annotations, sents, uid):
-
+    skipped = []
     shift = 0
     char_offsets = []
     labels = []
@@ -170,7 +128,7 @@ def annotate_doc_2(annotations, sents, uid):
                     continue
 
                 if len(span) != 1:
-                    print>>sys.stderr,"skipping discontinuous spans", entity
+                    skipped += [entity]
                     continue
 
                 for subspan in span:
@@ -214,7 +172,7 @@ def annotate_doc_2(annotations, sents, uid):
                         char_end -= 1
 
                     labels += [Annotation(entity_type, char_start, char_end, mention)]
-                    #labels += [(mention,char_start,char_end)]
+
 
             except:
                 print >>sys.stderr,"ERROR parsing", entity
@@ -229,9 +187,13 @@ def annotate_doc_2(annotations, sents, uid):
     # validate labels match new offsets
     for lbl in labels:
         mention,i,j = lbl.text, lbl.start, lbl.end
-        if mention.lower() != m_text[i:j].lower().replace("\n"," "):
+        if mention.lower() != m_text[i:j].lower().replace("\n"," ") or (mention==""):
             print mention, "VS", m_text[i:j]
             print lbl
+
+
+    if len(skipped) > 0:
+        print>> sys.stderr, "skipping {} discontinuous spans".format(len(skipped))
 
     return labels, sents
 
@@ -276,9 +238,11 @@ class Annotation(object):
 class i2b2MedicationParser(DocParser):
 
 
-    def __init__(self, inputpath=None, entity_type="drug", split_chars=[], use_unlabeled=False):
+    def __init__(self, inputpath=None, entity_type="drug", split_chars=[],
+                 use_unlabeled=False, verbose=False):
         super(i2b2MedicationParser, self).__init__(inputpath, "utf-8")
 
+        self.verbose = verbose
         self.freq_regex = re.compile("q\.\d+h\.")
         self.qty_regex = re.compile("\d,\d+")
 
@@ -302,211 +266,6 @@ class i2b2MedicationParser(DocParser):
         self._docs = {}
 
         self._preload(entity_type, use_unlabeled)
-
-    def __expand_tokens(self, sentences, tags):
-        '''
-        Several heuristics for dealing with noisy tokens in the i2b2
-        medication challenge data set. This includes
-        '''
-        updated = False
-        for i in range(len(sentences)):
-            s, t = [], []
-
-            for idx, word in enumerate(sentences[i]):
-
-                if len(word) == 1 or self.freq_regex.match(word):
-                    s += [sentences[i][idx]]
-                    t += [tags[i][idx]]
-                    continue
-
-                # if word.count("/") > 1 and not date_regex.match(word) and \
-                #  not telephone_regex.match(word) and re.sub("[0-9./]","",word).strip() != "" and \
-                #  re.match("([A-Za-z0-9]+[/])+",word):
-                #    print word
-
-
-                if re.match("^([*]+[A-Za-z0-9]+$)|([A-Za-z0-9]+?[*]+)$", word):
-
-                    subseq = [x for x in re.split("([*]+)", word) if x]
-
-                    if tags[i][idx].split("-") == ["O"]:
-                        s += subseq
-                        t += ['O', 'O']
-
-                    else:
-                        prefix = tags[i][idx].split("-")[0]
-                        etype = tags[i][idx].split("-")[-1]
-                        s += subseq
-                        t += ['%s-%s' % (prefix, etype), 'I-%s' % (etype)]
-
-                    updated = 1
-
-                # split training puncutation
-                elif (word[-1] in ["."] and word not in self.abbrv) or word[-1] in [",", ":", ";", "(", ")", "/"]:
-                    s += [sentences[i][idx][0:-1], word[-1]]
-                    t += [tags[i][idx], 'O']
-                    updated = 1
-
-                # split words consisting of concatenated tokens
-                elif re.search("^[a-zA-Z]{4,}[/.;:][a-zA-Z]{4,}$", word) or \
-                        re.search("^[a-zA-Z0-9]{2,}[=>][a-zA-Z0-9%.]{2,}$", word):
-
-                    # subseq = re.split("([/.;:=])",word)
-                    # split on first matched split token
-                    sidx = [word.index(ch) for ch in re.findall("([/.;:=>])", word)][0]
-                    subseq = [word[0:sidx], word[sidx], word[sidx + 1:]]
-
-                    if tags[i][idx].split("-") == ["O"]:
-                        s += subseq
-                        t += ['O', 'O', 'O']
-                    else:
-                        prefix = tags[i][idx].split("-")[0]
-                        etype = tags[i][idx].split("-")[-1]
-                        s += subseq
-                        t += ['%s-%s' % (prefix, etype), 'I-%s' % (etype), 'I-%s' % (etype)]
-
-                    updated = 1
-
-                # leave word as-is
-                else:
-                    s += [sentences[i][idx]]
-                    t += [tags[i][idx]]
-
-            sentences[i] = s
-            tags[i] = t
-
-        return updated
-
-    def __repair(self, sentences, tags):
-        '''
-        HACK function to fix sentence boundaries and word tokenization issues
-        in original corpus release. This is just a bunch of rules and observations
-        specific to the i2b2 corpus. If we don't fix sentences, then BIO
-        tagging breaks in several instances.
-        '''
-        # 1: Expand tokens
-        while self.__expand_tokens(sentences, tags):
-            pass
-
-        # 2: Create new sentence boundaries by merging sentences
-        dangling = [",", "Dr.", 'as', 'of', 'and', 'at'] + prepositions.keys()
-        sentence_fragments = ["Please see", "The"]
-
-        m_sentences, m_tags = [], []
-        curr_sentence, curr_tags = [], []
-        dangler = False
-
-        for i in range(len(sentences)):
-
-            if not sentences[i]:
-                continue
-
-            # ends if a preposition or other known dangling word
-            if dangler:
-                curr_sentence += [sentences[i]]
-                curr_tags += [tags[i]]
-
-            elif sentences[i][0][0].islower() and curr_sentence:
-                curr_sentence += [sentences[i]]
-                curr_tags += [tags[i]]
-
-            elif curr_sentence:
-                curr_sentence = reduce(lambda x, y: x + y, curr_sentence)
-                curr_tags = reduce(lambda x, y: x + y, curr_tags)
-
-                m_sentences += [curr_sentence]
-                m_tags += [curr_tags]
-
-                curr_sentence, curr_tags = [], []
-                curr_sentence += [sentences[i]]
-                curr_tags += [tags[i]]
-
-            else:
-                curr_sentence = [sentences[i]]
-                curr_tags = [tags[i]]
-
-            dangler = sentences[i][-1] in dangling
-
-        if curr_sentence:
-            m_sentences += [reduce(lambda x, y: x + y, curr_sentence)]
-            m_tags += [reduce(lambda x, y: x + y, curr_tags)]
-
-        #:3 split sentences
-        dangling = False
-        f_sentences, f_tags = [], []
-
-        for i in range(len(m_sentences)):
-
-            splits = []
-            for j in range(len(m_sentences[i]) - 1):
-                if m_sentences[i][j] == "." and m_sentences[i][j + 1][0].isupper():
-                    splits += [j + 1]
-            splits += [len(m_sentences[i])]
-
-            curr = 0
-
-            for idx in splits:
-                sentence = m_sentences[i][curr:idx]
-                tags = m_tags[i][curr:idx]
-
-                if dangling:
-                    f_sentences[-1] += sentence
-                    f_tags[-1] += tags
-                    dangling = False
-
-                else:
-                    f_sentences += [sentence]
-                    f_tags += [tags]
-
-                if " ".join(sentence).strip() in sentence_fragments:
-                    dangling = True
-
-                curr = idx
-
-        return f_sentences, f_tags
-
-    def _tags2offsets(self, sents, tags):
-
-        # create annotations
-        labels = []
-        shift = 0
-        char_offsets = []
-        for i in range(len(sents)):
-            s = zip(sents[i],tags[i])
-            offsets = [shift]
-            for chunk in [" ".join(sents[i][0:j]) for j in range(1,len(sents[i])+1)]:
-                offsets.append(len(chunk)+1+shift)
-
-            char_offsets.append(offsets[:-1])
-            shift = offsets[-1]
-
-            annotations = []
-            curr = []
-            for w in zip(sents[i],tags[i],offsets):
-                term,tag,char_start = w
-                if tag[0] == 'B':
-                    if curr:
-                        annotations.append(curr)
-                        curr = []
-                    curr.append(w)
-                elif tag[0] == 'I':
-                    curr.append(w)
-                elif curr:
-                    annotations.append(curr)
-                    curr = []
-
-            for ann in annotations:
-                term,tag,span = zip(*ann)
-                mention = " ".join(term)
-                entity_type = tag[0].split("-")[-1]
-                char_start, char_end = span[0],span[-1]+len(term[-1])
-
-
-                label = Annotation(entity_type, char_start, char_end, mention)
-                labels += [label]
-
-        return labels
-
 
 
     def _preload(self, et, use_unlabeled=False):
@@ -534,13 +293,23 @@ class i2b2MedicationParser(DocParser):
 
         # convert annotations to doc char offsets
         for idx, uid in enumerate(self.annotations):
-            self.labels[uid], self.documents[uid] = annotate_doc_2(self.annotations[uid], self.documents[uid], uid)
+            self.labels[uid], self.documents[uid] = annotate_doc(self.annotations[uid], self.documents[uid], uid)
 
         # repair sentence boundary errors
         for uid in self.documents:
             if uid not in self.labels:
                 merge_sent_idxs = repair_i2b2_sentence_boundaries(self.documents[uid])
                 self.documents[uid] = merge_sentences(self.documents[uid], merge_sent_idxs)
+
+        # define folds (use labeled data for dev/test only)
+        np.random.seed(12345)
+        uids = self.labels.keys()
+        np.random.shuffle(uids)
+        fold_defs = {"development":uids[0:125],"testing":uids[125:]}
+        #print len(fold_defs["testing"])
+        #print len(fold_defs["development"])
+        dev_fold = dict.fromkeys(uids[0:125])
+        #test_fold = dict.fromkeys(uids[125:])
 
         for uid in self.documents:
             attributes = {}
@@ -550,7 +319,7 @@ class i2b2MedicationParser(DocParser):
                 attributes["set"] = "training"
                 attributes["annotations"] = []
             else:
-                attributes["set"] = "testing"
+                attributes["set"] = "testing" if uid in dev_fold else "development"
                 attributes["annotations"] = self.labels[uid]
 
             self._docs[uid] = Document(uid, text, attributes=attributes)
