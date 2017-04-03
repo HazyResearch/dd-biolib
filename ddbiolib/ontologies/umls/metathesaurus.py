@@ -331,12 +331,12 @@ class TextNorm(object):
         return self.normalize(s)   
    
 class MetaNorm(TextNorm):
-    """
+    '''
     Normalize UMLS Metathesaurus concept strings. 
-    """
+    '''
     def __init__(self, function=lambda x:x):
         super(MetaNorm, self).__init__(function)
-        #self.counter = 100
+
         # TTY in [OF,FN] suffixes
         suffixes = ['qualifier value', 'life style', 'cell structure', 
                      'context\\-dependent category', 'inactive concept', 
@@ -358,13 +358,20 @@ class MetaNorm(TextNorm):
         
   
     def normalize(self,s):
-        """Heuristics for stripping non-essential UMLS string clutter"""
+        '''
+        Heuristics for stripping non-essential UMLS string clutter
+
+        :param s:
+        :return:
+        '''
         s = s.replace("--"," ")
         s = re.sub("[(\[<].+[>)\]]$", "", s)
         s = re.sub("(\[brand name\]|[,]* NOS)+","", s).strip()
         s = s.strip().strip("_").strip(":")
         s = re.sub("(\[.{1}\])+","", s).strip()
         s = re.sub("\-RETIRED\-$","",s).strip()
+
+        s = re.sub(" @ @ "," ",s).strip()
         
         # normalize TTY in [OF,FN]
         s = re.sub(self.of_fn_rgx,"",s).strip()
@@ -374,6 +381,7 @@ class MetaNorm(TextNorm):
         
         # custom normalize function
         s = self.function(s)
+
         return s
 
 

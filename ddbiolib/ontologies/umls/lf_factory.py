@@ -39,9 +39,7 @@ def build_umls_dictionaries(config,min_occur=1):
     filelist = glob.glob("{}/data/cache/*/*.txt".format(module_path))
     if len(filelist) > 0:
         return
-    
-    #mn = MetaNorm()
-    
+
     abbrv_tty = dict.fromkeys(['AA','AB','ACR'])
     not_term_tty = dict.fromkeys(['AA','AB','ACR','AUN']) 
     
@@ -137,8 +135,11 @@ class UmlsNoiseAwareDict(object):
                     try:
                         line = line.strip().decode('utf-8')
                         if normalize:
+
                             d_line = line
                             line = mn.apply(line)
+                            #if line.lower() == "activity":
+                            #    print line, d_line
                             # normalized form is too short -- skip
                             if len(line)/float(len(d_line)) < 0.2:
                                 #print "SKIPPING", d_line, "-->", line
